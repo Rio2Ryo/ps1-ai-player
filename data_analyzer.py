@@ -299,14 +299,98 @@ class CausalChainExtractor:
         return output_path
 
 
+def generate_sample_data(
+    output_path: Path,
+    num_rows: int = 500,
+    seed: int = 42,
+) -> Path:
+    """Generate synthetic sample CSV data for testing without a real game.
+
+    Simulates a theme park with correlated parameters:
+    - ride_intensity drives nausea (lagged)
+    - nausea drives vomit events and satisfaction drops (lagged)
+    - hunger increases over time and drives food purchases
+
+    Args:
+        output_path: Path to write the CSV file.
+        num_rows: Number of rows to generate.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Path to the generated CSV file.
+    """
+    rng = np.random.default_rng(seed)
+
+    timestamps = pd.date_range("2025-01-01", periods=num_rows, freq="5s")
+    frames = np.arange(num_rows)
+
+    # Base signals
+    ride_intensity = 50.0 + 30.0 * np.sin(frames * 0.02) + rng.normal(0, 5, num_rows)
+    ride_intensity = np.clip(ride_intensity, 0, 100)
+
+    # Nausea follows ride_intensity with a lag of ~5 steps
+    nausea = np.zeros(num_rows)
+    for i in range(num_rows):
+        lag_idx = max(0, i - 5)
+        nausea[i] = ride_intensity[lag_idx] * 0.6 + rng.normal(0, 3)
+    nausea = np.clip(nausea, 0, 100)
+
+    # Satisfaction inversely correlated with nausea (lag ~10 steps)
+    satisfaction = np.zeros(num_rows)
+    satisfaction[0] = 70.0
+    for i in range(1, num_rows):
+        lag_idx = max(0, i - 10)
+        nausea_effect = -0.15 * max(0, nausea[lag_idx] - 40)
+        satisfaction[i] = satisfaction[i - 1] + nausea_effect + rng.normal(0.1, 1)
+    satisfaction = np.clip(satisfaction, 0, 100)
+
+    # Hunger increases linearly with noise, resets periodically (eating)
+    hunger = np.zeros(num_rows)
+    for i in range(1, num_rows):
+        hunger[i] = hunger[i - 1] + 0.5 + rng.normal(0, 0.3)
+        if hunger[i] > 80:
+            hunger[i] = 10 + rng.normal(0, 3)  # ate food
+    hunger = np.clip(hunger, 0, 100)
+
+    # Money decreases with purchases, gets periodic income
+    money = np.zeros(num_rows)
+    money[0] = 5000
+    for i in range(1, num_rows):
+        income = rng.uniform(5, 15)
+        expense = 0
+        if hunger[i] < hunger[i - 1]:  # food purchase
+            expense += rng.uniform(8, 15)
+        money[i] = money[i - 1] + income - expense - rng.uniform(0, 3)
+
+    # Visitors fluctuate
+    visitors = 50 + 20 * np.sin(frames * 0.01) + rng.normal(0, 5, num_rows)
+    visitors = np.clip(visitors, 10, 100).astype(int)
+
+    df = pd.DataFrame({
+        "timestamp": timestamps.astype(str),
+        "frame": frames,
+        "money": np.round(money, 0).astype(int),
+        "visitors": visitors,
+        "satisfaction": np.round(satisfaction, 1),
+        "nausea": np.round(nausea, 1),
+        "hunger": np.round(hunger, 1),
+        "ride_intensity": np.round(ride_intensity, 1),
+    })
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, index=False)
+    print(f"Generated {num_rows} rows of sample data -> {output_path}")
+    return output_path
+
+
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Gameplay Data Causal Chain Analyzer")
     parser.add_argument(
         "--logs",
-        nargs="+",
+        nargs="*",
         type=Path,
-        required=True,
+        default=None,
         help="CSV log file paths",
     )
     parser.add_argument(
@@ -331,8 +415,23 @@ def main() -> None:
         default=None,
         help="OpenAI API key (default: OPENAI_API_KEY env var)",
     )
+    parser.add_argument(
+        "--generate-sample",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Generate sample CSV data at the given path and exit",
+    )
 
     args = parser.parse_args()
+
+    # Sample data generation mode
+    if args.generate_sample:
+        generate_sample_data(args.generate_sample)
+        return
+
+    if not args.logs:
+        parser.error("--logs is required (or use --generate-sample to create test data)")
 
     extractor = CausalChainExtractor()
     extractor.load_logs(args.logs)

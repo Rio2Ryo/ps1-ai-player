@@ -75,7 +75,11 @@ class MemoryScanner:
     def _find_ps1_ram_offset(self) -> int:
         """Parse /proc/PID/maps to find the PS1 RAM region base address.
 
-        Looks for a 2MB anonymous mapping that DuckStation uses for PS1 RAM.
+        Uses a multi-pass strategy:
+          1. Exact 2MB anonymous rw-p mapping (most reliable)
+          2. Exact 2MB anonymous rwx mapping (some kernel configs)
+          3. 2MB-aligned region within a larger anonymous rw mapping (8MB max)
+          4. Any rw mapping whose size is a small multiple of 2MB
         """
         if self.pid is None:
             return 0
@@ -83,40 +87,86 @@ class MemoryScanner:
         maps_path = Path(f"/proc/{self.pid}/maps")
         try:
             maps_content = maps_path.read_text()
-        except (PermissionError, FileNotFoundError):
+        except (PermissionError, FileNotFoundError, ProcessLookupError):
             print(f"Warning: Cannot read {maps_path}. Try running with sudo.")
             return 0
 
-        # Look for anonymous 2MB rw mappings (PS1 RAM)
-        for line in maps_content.splitlines():
-            match = re.match(
-                r"([0-9a-f]+)-([0-9a-f]+)\s+rw.+", line, re.IGNORECASE
-            )
-            if match:
-                start = int(match.group(1), 16)
-                end = int(match.group(2), 16)
-                size = end - start
-                if size == PS1_RAM_SIZE:
-                    print(f"Found PS1 RAM at offset: 0x{start:X} (size: {size} bytes)")
-                    return start
+        # Parse all mappings once
+        _MAP_RE = re.compile(
+            r"^([0-9a-f]+)-([0-9a-f]+)\s+(r[w-][x-][ps-])\s+"
+            r"([0-9a-f]+)\s+\S+\s+\d+\s*(.*)",
+            re.IGNORECASE,
+        )
 
-        # Fallback: look for larger mappings that could contain PS1 RAM
-        for line in maps_content.splitlines():
-            match = re.match(
-                r"([0-9a-f]+)-([0-9a-f]+)\s+rw.+", line, re.IGNORECASE
-            )
-            if match:
-                start = int(match.group(1), 16)
-                end = int(match.group(2), 16)
-                size = end - start
-                if size >= PS1_RAM_SIZE and size <= PS1_RAM_SIZE * 4:
-                    print(
-                        f"Found candidate RAM region at offset: 0x{start:X} "
-                        f"(size: {size} bytes)"
-                    )
-                    return start
+        @dataclass
+        class MapEntry:
+            start: int
+            end: int
+            perms: str
+            offset: int
+            pathname: str
 
-        print("Warning: Could not locate PS1 RAM region.")
+            @property
+            def size(self) -> int:
+                return self.end - self.start
+
+            @property
+            def is_anon(self) -> bool:
+                return self.pathname == "" or self.pathname.startswith("[")
+
+            @property
+            def is_writable(self) -> bool:
+                return len(self.perms) >= 2 and self.perms[1] == "w"
+
+        entries: list[MapEntry] = []
+        for line in maps_content.splitlines():
+            m = _MAP_RE.match(line)
+            if m:
+                entries.append(MapEntry(
+                    start=int(m.group(1), 16),
+                    end=int(m.group(2), 16),
+                    perms=m.group(3),
+                    offset=int(m.group(4), 16),
+                    pathname=m.group(5).strip(),
+                ))
+
+        # Pass 1: exact 2MB anonymous writable private mapping (offset 0)
+        for e in entries:
+            if e.size == PS1_RAM_SIZE and e.is_anon and e.is_writable and e.offset == 0:
+                print(f"Found PS1 RAM (exact 2MB anon rw): 0x{e.start:X}")
+                return e.start
+
+        # Pass 2: exact 2MB anonymous writable (any offset)
+        for e in entries:
+            if e.size == PS1_RAM_SIZE and e.is_anon and e.is_writable:
+                print(f"Found PS1 RAM (exact 2MB anon): 0x{e.start:X}")
+                return e.start
+
+        # Pass 3: larger anonymous rw region (up to 8MB) that could contain PS1 RAM
+        for e in entries:
+            if (
+                e.is_anon
+                and e.is_writable
+                and PS1_RAM_SIZE < e.size <= PS1_RAM_SIZE * 4
+                and e.offset == 0
+            ):
+                print(
+                    f"Found candidate PS1 RAM region: 0x{e.start:X} "
+                    f"(size: 0x{e.size:X}, using first 2MB)"
+                )
+                return e.start
+
+        # Pass 4: last resort - any writable mapping of plausible size
+        for e in entries:
+            if e.is_writable and e.size >= PS1_RAM_SIZE and e.size <= PS1_RAM_SIZE * 8:
+                print(
+                    f"Warning: Using fallback mapping at 0x{e.start:X} "
+                    f"(size: 0x{e.size:X}, perms: {e.perms})"
+                )
+                return e.start
+
+        print("Warning: Could not locate PS1 RAM region in /proc/PID/maps.")
+        print(f"  Scanned {len(entries)} mappings for PID {self.pid}.")
         return 0
 
     def _open_mem(self) -> int:

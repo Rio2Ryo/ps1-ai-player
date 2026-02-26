@@ -21,6 +21,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+MAX_API_RETRIES = 3
+RETRY_BACKOFF_BASE = 2.0  # seconds, doubles each retry
+
 import mss
 import mss.tools
 from PIL import Image
@@ -157,22 +160,40 @@ class GPT4VAnalyzer:
             },
         ]
 
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            max_tokens=500,
-            temperature=0.3,
-        )
+        import json
+        import re
+
+        last_error: Exception | None = None
+        for attempt in range(MAX_API_RETRIES):
+            try:
+                response = self.client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                    max_tokens=500,
+                    temperature=0.3,
+                )
+                break
+            except Exception as e:
+                last_error = e
+                wait = RETRY_BACKOFF_BASE * (2 ** attempt)
+                print(
+                    f"API error (attempt {attempt + 1}/{MAX_API_RETRIES}): {e}. "
+                    f"Retrying in {wait:.0f}s..."
+                )
+                time.sleep(wait)
+        else:
+            return {
+                "action": [],
+                "reasoning": f"API failed after {MAX_API_RETRIES} retries: {last_error}",
+                "observations": "",
+            }
 
         raw = response.choices[0].message.content or "{}"
 
         # Parse JSON from response (handle markdown code blocks)
-        import json
-        import re
-
         json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
         if json_match:
             raw = json_match.group(1)
@@ -372,8 +393,32 @@ class AIAgent:
     _running: bool = field(default=False, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
 
+    @staticmethod
+    def _check_duckstation_running() -> bool:
+        """Check if DuckStation is currently running."""
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                cmdline = (entry / "cmdline").read_text()
+                if "duckstation" in cmdline.lower():
+                    return True
+            except (PermissionError, FileNotFoundError, ProcessLookupError):
+                continue
+        return False
+
     def run(self) -> None:
         """Start the agent loop. Blocks until Ctrl+C."""
+        # Pre-flight checks
+        if not self._check_duckstation_running():
+            print("Warning: DuckStation does not appear to be running.")
+            print("Memory reading will fail. Start DuckStation first, or")
+            print("the agent will operate in screenshot-only mode.")
+
+        if not self.api_key and not os.environ.get("OPENAI_API_KEY"):
+            print("Error: No OpenAI API key. Set OPENAI_API_KEY or use --openai-key.")
+            sys.exit(1)
+
         screen = ScreenCapture()
         analyzer = GPT4VAnalyzer(api_key=self.api_key)
         keyboard = KeyboardController()
@@ -381,6 +426,7 @@ class AIAgent:
         logger = GameLogger(self.game_id)
 
         self._running = True
+        consecutive_errors = 0
 
         def stop(sig: int, frame: object) -> None:
             print("\nStopping agent...")
@@ -389,7 +435,7 @@ class AIAgent:
         signal.signal(signal.SIGINT, stop)
         signal.signal(signal.SIGTERM, stop)
 
-        print(f"=== AI Agent Started ===")
+        print("=== AI Agent Started ===")
         print(f"Game: {self.game_id}")
         print(f"Strategy: {self.strategy}")
         print(f"Detail: {self.detail}")
@@ -405,31 +451,35 @@ class AIAgent:
                 # 1. Screenshot
                 try:
                     image_b64 = screen.capture_to_base64()
+                    consecutive_errors = 0
                 except Exception as e:
+                    consecutive_errors += 1
                     print(f"Screenshot error: {e}")
+                    if consecutive_errors >= 5:
+                        print("Too many consecutive screenshot errors. Stopping.")
+                        break
                     time.sleep(self.interval)
                     continue
 
-                # 2. Read memory parameters
-                params = memory.read_all()
-                if params:
-                    param_str = " | ".join(f"{k}={v}" for k, v in params.items())
-                    print(f"Params: {param_str}")
-
-                # 3. GPT-4o Vision analysis
+                # 2. Read memory parameters (non-fatal if fails)
+                params: dict[str, int | float] = {}
                 try:
-                    context = f"Step {self._step}, strategy={self.strategy}"
-                    result = analyzer.analyze_screen(
-                        image_b64,
-                        context=context,
-                        strategy=self.strategy,
-                        parameters=params,
-                        detail=self.detail,
-                    )
+                    params = memory.read_all()
+                    if params:
+                        param_str = " | ".join(f"{k}={v}" for k, v in params.items())
+                        print(f"Params: {param_str}")
                 except Exception as e:
-                    print(f"API error: {e}")
-                    time.sleep(self.interval)
-                    continue
+                    print(f"Memory read error (non-fatal): {e}")
+
+                # 3. GPT-4o Vision analysis (retry is inside analyze_screen)
+                context = f"Step {self._step}, strategy={self.strategy}"
+                result = analyzer.analyze_screen(
+                    image_b64,
+                    context=context,
+                    strategy=self.strategy,
+                    parameters=params,
+                    detail=self.detail,
+                )
 
                 action = result.get("action", [])
                 reasoning = result.get("reasoning", "")
