@@ -69,10 +69,14 @@ else
     echo "  [FAIL] Xvfb not found"
 fi
 
-# Verify Python packages
-python3 -c "import mss; import pynput; import openai; import pandas; import matplotlib; import scipy" 2>/dev/null && \
-    echo "  [OK] Python packages installed" || \
+# Verify Python packages (pynput requires X server at import time, so check it separately)
+python3 -c "import mss; import openai; import pandas; import matplotlib; import scipy; import requests; import PIL; import numpy" 2>/dev/null && \
+    echo "  [OK] Core Python packages installed" || \
     echo "  [FAIL] Some Python packages missing"
+# pynput check: verify the package exists without importing (avoids X11 requirement)
+python3 -c "import importlib.util; exit(0 if importlib.util.find_spec('pynput') else 1)" 2>/dev/null && \
+    echo "  [OK] pynput installed (requires X server at runtime)" || \
+    echo "  [FAIL] pynput not found"
 
 # Verify DuckStation
 if [ -f "${DUCKSTATION_DIR}/DuckStation.AppImage" ]; then
