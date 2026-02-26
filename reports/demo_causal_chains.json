@@ -1,0 +1,170 @@
+{
+  "generated_at": "2026-02-26T17:25:40.036615",
+  "total_samples": 720,
+  "parameters": [
+    "money",
+    "visitors",
+    "satisfaction",
+    "nausea",
+    "hunger",
+    "ride_intensity"
+  ],
+  "chains": [
+    {
+      "trigger": "money change",
+      "effects": [
+        {
+          "parameter": "visitors",
+          "delta": "-0.64/step",
+          "lag_frames": 10,
+          "correlation": -0.8627
+        },
+        {
+          "parameter": "satisfaction",
+          "delta": "-0.94/step",
+          "lag_frames": 10,
+          "correlation": -0.8731
+        },
+        {
+          "parameter": "nausea",
+          "delta": "-0.13/step",
+          "lag_frames": 10,
+          "correlation": -0.3077
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.41/step",
+          "lag_frames": 10,
+          "correlation": -0.3382
+        }
+      ],
+      "confidence": 0.5954
+    },
+    {
+      "trigger": "visitors change",
+      "effects": [
+        {
+          "parameter": "satisfaction",
+          "delta": "-0.09/step",
+          "lag_frames": 1,
+          "correlation": 0.8787
+        },
+        {
+          "parameter": "nausea",
+          "delta": "-0.13/step",
+          "lag_frames": 10,
+          "correlation": 0.4184
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.41/step",
+          "lag_frames": 10,
+          "correlation": 0.4385
+        }
+      ],
+      "confidence": 0.5785
+    },
+    {
+      "trigger": "satisfaction change",
+      "effects": [
+        {
+          "parameter": "nausea",
+          "delta": "-0.13/step",
+          "lag_frames": 10,
+          "correlation": 0.3124
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.41/step",
+          "lag_frames": 10,
+          "correlation": 0.3912
+        }
+      ],
+      "confidence": 0.3518
+    },
+    {
+      "trigger": "nausea change",
+      "effects": [
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.02/step",
+          "lag_frames": 1,
+          "correlation": 0.9271
+        }
+      ],
+      "confidence": 0.9271
+    }
+  ],
+  "lag_correlations": {
+    "money -> visitors": {
+      "source": "money",
+      "target": "visitors",
+      "lag": 10,
+      "correlation": -0.8627,
+      "p_value": 0.0
+    },
+    "money -> satisfaction": {
+      "source": "money",
+      "target": "satisfaction",
+      "lag": 10,
+      "correlation": -0.8731,
+      "p_value": 0.0
+    },
+    "money -> nausea": {
+      "source": "money",
+      "target": "nausea",
+      "lag": 10,
+      "correlation": -0.3077,
+      "p_value": 0.00401
+    },
+    "money -> ride_intensity": {
+      "source": "money",
+      "target": "ride_intensity",
+      "lag": 10,
+      "correlation": -0.3382,
+      "p_value": 0.001998
+    },
+    "visitors -> satisfaction": {
+      "source": "visitors",
+      "target": "satisfaction",
+      "lag": 1,
+      "correlation": 0.8787,
+      "p_value": 0.0
+    },
+    "visitors -> nausea": {
+      "source": "visitors",
+      "target": "nausea",
+      "lag": 10,
+      "correlation": 0.4184,
+      "p_value": 0.0
+    },
+    "visitors -> ride_intensity": {
+      "source": "visitors",
+      "target": "ride_intensity",
+      "lag": 10,
+      "correlation": 0.4385,
+      "p_value": 0.0
+    },
+    "satisfaction -> nausea": {
+      "source": "satisfaction",
+      "target": "nausea",
+      "lag": 10,
+      "correlation": 0.3124,
+      "p_value": 0.003603
+    },
+    "satisfaction -> ride_intensity": {
+      "source": "satisfaction",
+      "target": "ride_intensity",
+      "lag": 10,
+      "correlation": 0.3912,
+      "p_value": 0.0
+    },
+    "nausea -> ride_intensity": {
+      "source": "nausea",
+      "target": "ride_intensity",
+      "lag": 1,
+      "correlation": 0.9271,
+      "p_value": 0.0
+    }
+  }
+}

@@ -23,6 +23,8 @@ from typing import Any
 
 MAX_API_RETRIES = 3
 RETRY_BACKOFF_BASE = 2.0  # seconds, doubles each retry
+DUCKSTATION_WAIT_TIMEOUT = 60  # seconds to wait for DuckStation to start
+DUCKSTATION_POLL_INTERVAL = 3  # seconds between PID checks
 
 import mss
 import mss.tools
@@ -41,8 +43,25 @@ class ScreenCapture:
     """Capture the DuckStation window using mss (X11/Wayland compatible)."""
 
     def __init__(self) -> None:
-        self._sct = mss.mss()
         self._is_wayland = "WAYLAND_DISPLAY" in os.environ
+
+        # Validate display environment before initializing mss
+        if not self._is_wayland and not os.environ.get("DISPLAY"):
+            raise RuntimeError(
+                "No display server detected. Set DISPLAY (e.g., DISPLAY=:99 for Xvfb) "
+                "or run under Wayland. If running headless, start Xvfb first:\n"
+                "  Xvfb :99 -screen 0 1280x1024x24 &\n"
+                "  export DISPLAY=:99"
+            )
+
+        try:
+            self._sct = mss.mss()
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to initialize screen capture: {e}\n"
+                f"DISPLAY={os.environ.get('DISPLAY', '(not set)')}, "
+                f"WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY', '(not set)')}"
+            ) from e
 
     def capture(self, monitor_index: int = 1) -> Image.Image:
         """Capture the screen (or specific monitor) as a PIL Image.
@@ -407,17 +426,44 @@ class AIAgent:
                 continue
         return False
 
+    def _wait_for_duckstation(self) -> bool:
+        """Wait for DuckStation to start, polling up to DUCKSTATION_WAIT_TIMEOUT seconds.
+
+        Returns:
+            True if DuckStation was found, False if timeout.
+        """
+        if self._check_duckstation_running():
+            print("DuckStation is running.")
+            return True
+
+        print(
+            f"DuckStation not detected. Waiting up to {DUCKSTATION_WAIT_TIMEOUT}s "
+            f"for it to start..."
+        )
+        elapsed = 0.0
+        while elapsed < DUCKSTATION_WAIT_TIMEOUT:
+            time.sleep(DUCKSTATION_POLL_INTERVAL)
+            elapsed += DUCKSTATION_POLL_INTERVAL
+            if self._check_duckstation_running():
+                print(f"DuckStation detected after {elapsed:.0f}s.")
+                return True
+            print(f"  Waiting... ({elapsed:.0f}/{DUCKSTATION_WAIT_TIMEOUT}s)")
+
+        print(
+            "Warning: DuckStation not found after timeout. "
+            "Memory reading will be unavailable. "
+            "Agent will operate in screenshot-only mode."
+        )
+        return False
+
     def run(self) -> None:
         """Start the agent loop. Blocks until Ctrl+C."""
         # Pre-flight checks
-        if not self._check_duckstation_running():
-            print("Warning: DuckStation does not appear to be running.")
-            print("Memory reading will fail. Start DuckStation first, or")
-            print("the agent will operate in screenshot-only mode.")
-
         if not self.api_key and not os.environ.get("OPENAI_API_KEY"):
             print("Error: No OpenAI API key. Set OPENAI_API_KEY or use --openai-key.")
             sys.exit(1)
+
+        self._wait_for_duckstation()
 
         screen = ScreenCapture()
         analyzer = GPT4VAnalyzer(api_key=self.api_key)
