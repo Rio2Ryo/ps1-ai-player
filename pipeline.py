@@ -14,6 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from log_config import get_logger
+
+logger = get_logger(__name__)
+
 from data_analyzer import CausalChainExtractor
 from gdd_generator import GDDGenerator
 from game_prototype import ParkSimulator, RideAttraction, VisitorAgent
@@ -30,15 +34,15 @@ def run_analysis(
     Returns:
         Tuple of (extractor, path to saved JSON).
     """
-    print("=" * 60)
-    print("STEP 1: Causal Chain Analysis")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("STEP 1: Causal Chain Analysis")
+    logger.info("=" * 60)
 
     extractor = CausalChainExtractor()
     extractor.load_logs(log_files)
 
     if extractor.df.empty:
-        print("Error: No data loaded from log files.")
+        logger.error("No data loaded from log files.")
         sys.exit(1)
 
     extractor.compute_correlations()
@@ -49,7 +53,7 @@ def run_analysis(
         extractor.llm_inference(api_key=api_key)
 
     result_path = extractor.save_results()
-    print(f"\nAnalysis complete: {len(extractor.causal_chains)} causal chains found.")
+    logger.info("Analysis complete: %d causal chains found.", len(extractor.causal_chains))
     return extractor, result_path
 
 
@@ -64,9 +68,9 @@ def generate_gdd(
     Returns:
         Tuple of (GDD content, path to saved file).
     """
-    print("\n" + "=" * 60)
-    print("STEP 2: GDD Generation")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("STEP 2: GDD Generation")
+    logger.info("=" * 60)
 
     generator = GDDGenerator()
     generator.load_causal_chains(chains_path)
@@ -77,7 +81,7 @@ def generate_gdd(
         gdd_content = _generate_local_gdd(generator, game_id)
 
     gdd_path = generator.save_gdd(gdd_content, game_id=game_id)
-    print(f"\nGDD generated: {gdd_path}")
+    logger.info("GDD generated: %s", gdd_path)
     return gdd_content, gdd_path
 
 
@@ -156,9 +160,9 @@ def run_simulation(
     Returns:
         Final simulation state.
     """
-    print("\n" + "=" * 60)
-    print("STEP 3: Prototype Simulation")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("STEP 3: Prototype Simulation")
+    logger.info("=" * 60)
 
     if gdd_path and gdd_path.exists():
         sim = ParkSimulator.from_gdd(gdd_path)
@@ -174,7 +178,7 @@ def run_simulation(
 
     final_state = sim.run(frames=frames, verbose=verbose)
 
-    print(f"\nSimulation complete: {frames} frames")
+    logger.info("Simulation complete: %d frames", frames)
     return final_state
 
 
@@ -247,13 +251,13 @@ def main() -> None:
         )
 
     # Summary
-    print("\n" + "=" * 60)
-    print("PIPELINE COMPLETE")
-    print("=" * 60)
-    print(f"Causal chains: {chains_path}")
-    print(f"GDD:           {gdd_path}")
+    logger.info("=" * 60)
+    logger.info("PIPELINE COMPLETE")
+    logger.info("=" * 60)
+    logger.info("Causal chains: %s", chains_path)
+    logger.info("GDD:           %s", gdd_path)
     if not args.skip_sim:
-        print(f"Simulation:    {args.sim_frames} frames completed")
+        logger.info("Simulation:    %d frames completed", args.sim_frames)
 
 
 if __name__ == "__main__":

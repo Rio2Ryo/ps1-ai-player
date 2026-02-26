@@ -15,6 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from log_config import get_logger
+
+_log = get_logger(__name__)
+
 # Data type definitions: (struct format, byte size)
 DATA_TYPES: dict[str, tuple[str, int]] = {
     "int8": ("b", 1),
@@ -65,11 +69,11 @@ class MemoryScanner:
                 cmdline = (entry / "cmdline").read_text()
                 if "duckstation" in cmdline.lower():
                     pid = int(entry.name)
-                    print(f"Found DuckStation PID: {pid}")
+                    _log.info("Found DuckStation PID: %d", pid)
                     return pid
             except (PermissionError, FileNotFoundError, ProcessLookupError):
                 continue
-        print("Warning: DuckStation process not found.")
+        _log.warning("DuckStation process not found.")
         return None
 
     def _find_ps1_ram_offset(self) -> int:
@@ -88,7 +92,7 @@ class MemoryScanner:
         try:
             maps_content = maps_path.read_text()
         except (PermissionError, FileNotFoundError, ProcessLookupError):
-            print(f"Warning: Cannot read {maps_path}. Try running with sudo.")
+            _log.warning("Cannot read %s. Try running with sudo.", maps_path)
             return 0
 
         # Parse all mappings once
@@ -133,13 +137,13 @@ class MemoryScanner:
         # Pass 1: exact 2MB anonymous writable private mapping (offset 0)
         for e in entries:
             if e.size == PS1_RAM_SIZE and e.is_anon and e.is_writable and e.offset == 0:
-                print(f"Found PS1 RAM (exact 2MB anon rw): 0x{e.start:X}")
+                _log.info("Found PS1 RAM (exact 2MB anon rw): 0x%X", e.start)
                 return e.start
 
         # Pass 2: exact 2MB anonymous writable (any offset)
         for e in entries:
             if e.size == PS1_RAM_SIZE and e.is_anon and e.is_writable:
-                print(f"Found PS1 RAM (exact 2MB anon): 0x{e.start:X}")
+                _log.info("Found PS1 RAM (exact 2MB anon): 0x%X", e.start)
                 return e.start
 
         # Pass 3: larger anonymous rw region (up to 8MB) that could contain PS1 RAM
@@ -150,23 +154,25 @@ class MemoryScanner:
                 and PS1_RAM_SIZE < e.size <= PS1_RAM_SIZE * 4
                 and e.offset == 0
             ):
-                print(
-                    f"Found candidate PS1 RAM region: 0x{e.start:X} "
-                    f"(size: 0x{e.size:X}, using first 2MB)"
+                _log.info(
+                    "Found candidate PS1 RAM region: 0x%X (size: 0x%X, using first 2MB)",
+                    e.start, e.size,
                 )
                 return e.start
 
         # Pass 4: last resort - any writable mapping of plausible size
         for e in entries:
             if e.is_writable and e.size >= PS1_RAM_SIZE and e.size <= PS1_RAM_SIZE * 8:
-                print(
-                    f"Warning: Using fallback mapping at 0x{e.start:X} "
-                    f"(size: 0x{e.size:X}, perms: {e.perms})"
+                _log.warning(
+                    "Using fallback mapping at 0x%X (size: 0x%X, perms: %s)",
+                    e.start, e.size, e.perms,
                 )
                 return e.start
 
-        print("Warning: Could not locate PS1 RAM region in /proc/PID/maps.")
-        print(f"  Scanned {len(entries)} mappings for PID {self.pid}.")
+        _log.warning(
+            "Could not locate PS1 RAM region in /proc/PID/maps. "
+            "Scanned %d mappings for PID %s.", len(entries), self.pid,
+        )
         return 0
 
     def _open_mem(self) -> int:

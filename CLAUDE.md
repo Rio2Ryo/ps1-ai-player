@@ -13,12 +13,14 @@ run.sh (orchestrator)
   ├── Xvfb :99           (virtual display)
   ├── DuckStation         (PS1 emulator, AppImage)
   ├── memory_logger.py    (CSV logging from /proc/PID/mem)
-  └── ai_agent.py         (GPT-4o Vision → keyboard input)
+  ├── ai_agent.py         (GPT-4o Vision → keyboard input)
+  └── pipeline.py         (auto-runs after session: analysis → GDD → charts)
 
 pipeline.py (post-session analysis)
   ├── data_analyzer.py    (correlation + lag analysis → causal chains JSON)
-  ├── gdd_generator.py    (causal chains → GDD markdown)
-  └── game_prototype.py   (GDD → Python simulation)
+  ├── gdd_generator.py    (causal chains → GDD markdown, local or LLM)
+  ├── visualizer.py       (matplotlib: heatmap, time-series, causal graph)
+  └── game_prototype.py   (GDD → Python simulation → CSV export)
 ```
 
 ## Key Files
@@ -35,10 +37,14 @@ pipeline.py (post-session analysis)
 | `ai_agent.py` | Main agent: screenshot → GPT-4o → keyboard input loop |
 | `data_analyzer.py` | Pearson + lag cross-correlation → causal chains |
 | `gdd_generator.py` | Causal chains → GDD (local + GPT-4 generation) |
-| `game_prototype.py` | Theme park simulator with from_gdd() loading |
+| `game_prototype.py` | Theme park simulator with from_gdd() + CSV export |
 | `pipeline.py` | End-to-end: logs → analysis → GDD → prototype |
-| `run.sh` | Master launcher (Xvfb + DuckStation + logger + agent) |
+| `visualizer.py` | Matplotlib charts: heatmap, time-series, lag bars, causal graph |
+| `log_config.py` | Shared Python logging configuration |
+| `run.sh` | Master launcher (Xvfb → DuckStation → logger → agent → pipeline) |
 | `sample_data/generate_sample.py` | Standalone synthetic data generator (stdlib-only) |
+| `tests/` | pytest suite (31 tests) |
+| `pyproject.toml` | Project metadata + pytest configuration |
 
 ## Dev Commands
 
@@ -46,21 +52,30 @@ pipeline.py (post-session analysis)
 # Setup
 bash setup.sh
 
+# Run tests
+source venv/bin/activate
+pytest tests/ -v
+
 # Generate sample data (no dependencies needed)
 python3 sample_data/generate_sample.py
 
 # Run analysis on sample data
-source venv/bin/activate
 python data_analyzer.py --logs sample_data/sample_log.csv
+
+# Generate visualizations
+python visualizer.py --csv sample_data/sample_log.csv --chains reports/demo_causal_chains.json
 
 # Full pipeline (analysis → GDD → simulation)
 python pipeline.py --logs sample_data/sample_log.csv --game DEMO
 
-# Run simulation prototype
-python game_prototype.py --frames 3600 --verbose
+# Run simulation with CSV export
+python game_prototype.py --frames 3600 --verbose --csv-output reports/sim_output.csv
 
 # Memory scanning (requires DuckStation running)
 sudo python memory_scanner.py
+
+# Generate Lua logger script from addresses
+python lua_generator.py --game SLPM-86023
 
 # Full session (requires DuckStation + ISO + API key)
 ./run.sh --game SLPM-86023 --iso isos/game.iso --strategy balanced
@@ -68,13 +83,16 @@ sudo python memory_scanner.py
 
 ## Key Technical Patterns
 
+- **Logging**: `from log_config import get_logger` — structured logging in all modules
 - **PS1 RAM**: 2MB at 0x00000000-0x001FFFFF, accessed via `/proc/PID/mem`
 - **Memory detection**: 4-pass strategy in `_find_ps1_ram_offset()` parsing `/proc/PID/maps`
 - **API retry**: Exponential backoff (2s base, 3 retries) in `GPT4VAnalyzer.analyze_screen()`
 - **Action history**: Sliding window of last 10 actions sent as context to GPT-4o
-- **Cost tracking**: Token usage tracked per step, summary saved to logs/
+- **Cost tracking**: Token usage tracked per step, .cost.json saved alongside logs
 - **Key mapping**: Arrow=D-pad, Z=Circle, X=Cross, A=Square, S=Triangle, Enter=Start, Space=Select
 - **pynput caveat**: Requires X11 at import time — use `importlib.util.find_spec()` for headless checks
+- **Local GDD**: pipeline.py can generate full GDD without API key (statistical analysis only)
+- **Auto-pipeline**: run.sh automatically runs analysis + visualization after agent session
 
 ## Environment
 

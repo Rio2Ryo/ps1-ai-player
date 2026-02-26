@@ -184,4 +184,34 @@ wait "$AGENT_PID" 2>/dev/null || true
 echo ""
 echo "=== Session Complete ==="
 echo "Logs saved in: ${SCRIPT_DIR}/logs/"
-echo "Run data analysis: $PYTHON ${SCRIPT_DIR}/data_analyzer.py --logs ${SCRIPT_DIR}/logs/*.csv"
+
+# Step 5: Auto-run analysis pipeline on collected logs
+LATEST_LOGS=$(ls -t "${SCRIPT_DIR}"/logs/*_${GAME_ID}*.csv 2>/dev/null | head -5)
+
+if [ -n "$LATEST_LOGS" ]; then
+    echo ""
+    echo "[5/5] Running post-session analysis pipeline..."
+    "$PYTHON" "${SCRIPT_DIR}/pipeline.py" \
+        --logs $LATEST_LOGS \
+        --game "$GAME_ID" \
+        --skip-sim || {
+        echo "Warning: Pipeline analysis failed (non-fatal)."
+    }
+
+    # Generate visualizations if CSV logs exist
+    FIRST_LOG=$(echo "$LATEST_LOGS" | head -1)
+    LATEST_CHAINS=$(ls -t "${SCRIPT_DIR}"/reports/causal_chains_*.json 2>/dev/null | head -1)
+    if [ -n "$FIRST_LOG" ]; then
+        echo "Generating visualizations..."
+        "$PYTHON" "${SCRIPT_DIR}/visualizer.py" \
+            --csv "$FIRST_LOG" \
+            ${LATEST_CHAINS:+--chains "$LATEST_CHAINS"} \
+            --output "${SCRIPT_DIR}/reports/" 2>/dev/null || true
+    fi
+
+    echo ""
+    echo "Reports saved in: ${SCRIPT_DIR}/reports/"
+else
+    echo "No logs found for ${GAME_ID}. Skipping analysis."
+    echo "To run manually: $PYTHON ${SCRIPT_DIR}/pipeline.py --logs ${SCRIPT_DIR}/logs/*.csv --game ${GAME_ID}"
+fi

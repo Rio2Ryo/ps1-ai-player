@@ -18,6 +18,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from log_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class CausalChainExtractor:
     """Extract causal relationships from gameplay data logs."""
@@ -43,12 +47,12 @@ class CausalChainExtractor:
                 df = pd.read_csv(f)
                 df["source_file"] = f.name
                 frames.append(df)
-                print(f"Loaded: {f.name} ({len(df)} rows)")
+                logger.info("Loaded: %s (%d rows)", f.name, len(df))
             except Exception as e:
-                print(f"Warning: Could not load {f}: {e}")
+                logger.warning("Could not load %s: %s", f, e)
 
         if not frames:
-            print("No data loaded.")
+            logger.warning("No data loaded.")
             return pd.DataFrame()
 
         self.df = pd.concat(frames, ignore_index=True)
@@ -61,7 +65,7 @@ class CausalChainExtractor:
             and pd.api.types.is_numeric_dtype(self.df[c])
         ]
 
-        print(f"Total: {len(self.df)} rows, {len(self._numeric_cols)} numeric parameters")
+        logger.info("Total: %d rows, %d numeric parameters", len(self.df), len(self._numeric_cols))
         return self.df
 
     def compute_correlations(self) -> pd.DataFrame:
@@ -74,7 +78,7 @@ class CausalChainExtractor:
             return pd.DataFrame()
 
         self.correlations = self.df[self._numeric_cols].corr(method="pearson")
-        print("Correlation matrix computed.")
+        logger.info("Correlation matrix computed.")
         return self.correlations
 
     def detect_lag_correlations(self, max_lag: int = 10) -> dict[str, Any]:
@@ -131,13 +135,13 @@ class CausalChainExtractor:
                         "correlation": round(best_corr, 4),
                         "p_value": round(best_pval, 6),
                     }
-                    print(
-                        f"  Lag correlation: {col_a} -> {col_b} "
-                        f"(lag={best_lag}, r={best_corr:.3f}, p={best_pval:.4f})"
+                    logger.info(
+                        "  Lag correlation: %s -> %s (lag=%d, r=%.3f, p=%.4f)",
+                        col_a, col_b, best_lag, best_corr, best_pval,
                     )
 
         self.lag_correlations = results
-        print(f"Found {len(results)} significant lag correlations.")
+        logger.info("Found %d significant lag correlations.", len(results))
         return results
 
     def build_causal_graph(self) -> list[dict[str, Any]]:
@@ -197,7 +201,7 @@ class CausalChainExtractor:
             chains.append(chain)
 
         self.causal_chains = chains
-        print(f"Built {len(chains)} causal chains.")
+        logger.info("Built %d causal chains.", len(chains))
         return chains
 
     def llm_inference(
@@ -265,7 +269,7 @@ class CausalChainExtractor:
 
         # Merge with statistical chains
         self.causal_chains.extend(llm_chains)
-        print(f"LLM added {len(llm_chains)} causal chain inferences.")
+        logger.info("LLM added %d causal chain inferences.", len(llm_chains))
         return llm_chains
 
     def save_results(
@@ -295,7 +299,7 @@ class CausalChainExtractor:
         }
 
         output_path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
-        print(f"Results saved to: {output_path}")
+        logger.info("Results saved to: %s", output_path)
         return output_path
 
 
@@ -379,7 +383,7 @@ def generate_sample_data(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)
-    print(f"Generated {num_rows} rows of sample data -> {output_path}")
+    logger.info("Generated %d rows of sample data -> %s", num_rows, output_path)
     return output_path
 
 
@@ -437,7 +441,7 @@ def main() -> None:
     extractor.load_logs(args.logs)
 
     if extractor.df.empty:
-        print("No data to analyze.")
+        logger.warning("No data to analyze.")
         return
 
     extractor.compute_correlations()

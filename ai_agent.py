@@ -12,6 +12,7 @@ import argparse
 import base64
 import csv
 import io
+import logging
 import os
 import signal
 import sys
@@ -20,6 +21,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from log_config import get_logger
+
+logger = get_logger(__name__)
 
 MAX_API_RETRIES = 3
 RETRY_BACKOFF_BASE = 2.0  # seconds, doubles each retry
@@ -312,9 +317,9 @@ class GPT4VAnalyzer:
             except Exception as e:
                 last_error = e
                 wait = RETRY_BACKOFF_BASE * (2 ** attempt)
-                print(
-                    f"API error (attempt {attempt + 1}/{MAX_API_RETRIES}): {e}. "
-                    f"Retrying in {wait:.0f}s..."
+                logger.warning(
+                    "API error (attempt %d/%d): %s. Retrying in %.0fs...",
+                    attempt + 1, MAX_API_RETRIES, e, wait,
                 )
                 time.sleep(wait)
         else:
@@ -388,7 +393,7 @@ class KeyboardController:
         """
         key = KEY_MAP.get(key_name.lower())
         if key is None:
-            print(f"Warning: Unknown key '{key_name}'")
+            logger.warning("Unknown key '%s'", key_name)
             return
 
         self._kbd.press(key)
@@ -554,24 +559,24 @@ class AIAgent:
             True if DuckStation was found, False if timeout.
         """
         if self._check_duckstation_running():
-            print("DuckStation is running.")
+            logger.info("DuckStation is running.")
             return True
 
-        print(
-            f"DuckStation not detected. Waiting up to {DUCKSTATION_WAIT_TIMEOUT}s "
-            f"for it to start..."
+        logger.info(
+            "DuckStation not detected. Waiting up to %ds for it to start...",
+            DUCKSTATION_WAIT_TIMEOUT,
         )
         elapsed = 0.0
         while elapsed < DUCKSTATION_WAIT_TIMEOUT:
             time.sleep(DUCKSTATION_POLL_INTERVAL)
             elapsed += DUCKSTATION_POLL_INTERVAL
             if self._check_duckstation_running():
-                print(f"DuckStation detected after {elapsed:.0f}s.")
+                logger.info("DuckStation detected after %.0fs.", elapsed)
                 return True
-            print(f"  Waiting... ({elapsed:.0f}/{DUCKSTATION_WAIT_TIMEOUT}s)")
+            logger.debug("Waiting... (%.0f/%ds)", elapsed, DUCKSTATION_WAIT_TIMEOUT)
 
-        print(
-            "Warning: DuckStation not found after timeout. "
+        logger.warning(
+            "DuckStation not found after timeout. "
             "Memory reading will be unavailable. "
             "Agent will operate in screenshot-only mode."
         )
@@ -581,7 +586,7 @@ class AIAgent:
         """Start the agent loop. Blocks until Ctrl+C."""
         # Pre-flight checks
         if not self.api_key and not os.environ.get("OPENAI_API_KEY"):
-            print("Error: No OpenAI API key. Set OPENAI_API_KEY or use --openai-key.")
+            logger.error("No OpenAI API key. Set OPENAI_API_KEY or use --openai-key.")
             sys.exit(1)
 
         self._wait_for_duckstation()
@@ -590,7 +595,7 @@ class AIAgent:
         analyzer = GPT4VAnalyzer(api_key=self.api_key)
         keyboard = KeyboardController()
         memory = MemoryReader(self.game_id)
-        logger = GameLogger(self.game_id)
+        game_logger = GameLogger(self.game_id)
         history = ActionHistory()
         cost_tracker = CostTracker()
 
@@ -598,25 +603,22 @@ class AIAgent:
         consecutive_errors = 0
 
         def stop(sig: int, frame: object) -> None:
-            print("\nStopping agent...")
+            logger.info("Stopping agent...")
             self._running = False
 
         signal.signal(signal.SIGINT, stop)
         signal.signal(signal.SIGTERM, stop)
 
-        print("=== AI Agent Started ===")
-        print(f"Game: {self.game_id}")
-        print(f"Strategy: {self.strategy}")
-        print(f"Detail: {self.detail}")
-        print(f"Interval: {self.interval}s")
-        print(f"History window: {ACTION_HISTORY_SIZE} steps")
-        print(f"Log: {logger.log_path}")
-        print("Press Ctrl+C to stop.\n")
+        logger.info("=== AI Agent Started ===")
+        logger.info("Game: %s | Strategy: %s | Detail: %s | Interval: %.1fs",
+                     self.game_id, self.strategy, self.detail, self.interval)
+        logger.info("History window: %d steps", ACTION_HISTORY_SIZE)
+        logger.info("Log: %s", game_logger.log_path)
 
         try:
             while self._running:
                 self._step += 1
-                print(f"--- Step {self._step} ---")
+                logger.info("--- Step %d ---", self._step)
 
                 # 1. Screenshot
                 try:
@@ -624,9 +626,9 @@ class AIAgent:
                     consecutive_errors = 0
                 except Exception as e:
                     consecutive_errors += 1
-                    print(f"Screenshot error: {e}")
+                    logger.error("Screenshot error: %s", e)
                     if consecutive_errors >= 5:
-                        print("Too many consecutive screenshot errors. Stopping.")
+                        logger.error("Too many consecutive screenshot errors. Stopping.")
                         break
                     time.sleep(self.interval)
                     continue
@@ -637,9 +639,9 @@ class AIAgent:
                     params = memory.read_all()
                     if params:
                         param_str = " | ".join(f"{k}={v}" for k, v in params.items())
-                        print(f"Params: {param_str}")
+                        logger.info("Params: %s", param_str)
                 except Exception as e:
-                    print(f"Memory read error (non-fatal): {e}")
+                    logger.debug("Memory read error (non-fatal): %s", e)
 
                 # 3. GPT-4o Vision analysis with action history
                 context = f"Step {self._step}, strategy={self.strategy}"
@@ -661,12 +663,12 @@ class AIAgent:
                 output_tokens = result.pop("_output_tokens", 0)
                 step_cost = cost_tracker.record(self._step, input_tokens, output_tokens)
 
-                print(f"Action: {action}")
-                print(f"Reason: {reasoning}")
-                print(
-                    f"Cost: ${step_cost:.4f} "
-                    f"(total: ${cost_tracker.total_cost:.4f}, "
-                    f"{cost_tracker.total_input_tokens}+{cost_tracker.total_output_tokens} tokens)"
+                logger.info("Action: %s", action)
+                logger.info("Reason: %s", reasoning)
+                logger.info(
+                    "Cost: $%.4f (total: $%.4f, %d+%d tokens)",
+                    step_cost, cost_tracker.total_cost,
+                    cost_tracker.total_input_tokens, cost_tracker.total_output_tokens,
                 )
 
                 # 4. Execute actions
@@ -683,27 +685,30 @@ class AIAgent:
                 ))
 
                 # 6. Log
-                logger.log(self._step, action, reasoning, observations, params)
+                game_logger.log(self._step, action, reasoning, observations, params)
 
                 time.sleep(self.interval)
 
         finally:
             memory.close()
-            logger.close()
+            game_logger.close()
 
             # Save cost summary
             cost_summary = cost_tracker.summary()
-            print(f"\nAgent stopped after {self._step} steps.")
-            print(f"Log saved to: {logger.log_path}")
-            print(f"API cost: ${cost_summary['total_cost_usd']:.4f} "
-                  f"({cost_summary['api_calls']} calls, "
-                  f"avg ${cost_summary['avg_cost_per_call']:.6f}/call)")
+            logger.info("Agent stopped after %d steps.", self._step)
+            logger.info("Log saved to: %s", game_logger.log_path)
+            logger.info(
+                "API cost: $%.4f (%d calls, avg $%.6f/call)",
+                cost_summary['total_cost_usd'],
+                cost_summary['api_calls'],
+                cost_summary['avg_cost_per_call'],
+            )
 
             # Write cost summary JSON next to the log
             import json as _json
-            cost_path = logger.log_path.with_suffix(".cost.json")
+            cost_path = game_logger.log_path.with_suffix(".cost.json")
             cost_path.write_text(_json.dumps(cost_summary, indent=2))
-            print(f"Cost summary: {cost_path}")
+            logger.info("Cost summary: %s", cost_path)
 
 
 # ---------------------------------------------------------------------------

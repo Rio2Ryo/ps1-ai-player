@@ -9,10 +9,12 @@ Thresholds can be loaded from GDD files via from_gdd() methods.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import random
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -316,12 +318,18 @@ class ParkSimulator:
 
         return all_events
 
-    def run(self, frames: int = 3600, verbose: bool = False) -> dict[str, Any]:
+    def run(
+        self,
+        frames: int = 3600,
+        verbose: bool = False,
+        csv_path: Path | None = None,
+    ) -> dict[str, Any]:
         """Run the simulation for a number of frames.
 
         Args:
             frames: Number of ticks to simulate.
             verbose: Print state every 60 ticks.
+            csv_path: If set, export per-tick state to this CSV file.
 
         Returns:
             Final state dict.
@@ -329,19 +337,49 @@ class ParkSimulator:
         print(f"Running simulation for {frames} frames...")
         print(f"Starting state: {self.get_state()}")
 
-        for _ in range(frames):
-            events = self.tick()
+        csv_file = None
+        csv_writer = None
+        if csv_path:
+            csv_path.parent.mkdir(parents=True, exist_ok=True)
+            csv_file = open(csv_path, "w", newline="")
+            csv_writer = csv.writer(csv_file)
+            csv_writer.writerow([
+                "tick", "park_money", "cleanliness", "visitor_count",
+                "avg_satisfaction", "avg_nausea", "avg_hunger",
+                "attraction_count", "events",
+            ])
 
-            if verbose and self.tick_count % 60 == 0:
+        try:
+            for _ in range(frames):
+                events = self.tick()
                 state = self.get_state()
-                print(
-                    f"[{state['tick']}] "
-                    f"Visitors={state['visitor_count']} "
-                    f"Sat={state['avg_satisfaction']:.1f} "
-                    f"Nausea={state['avg_nausea']:.1f} "
-                    f"Money={state['park_money']:.0f} "
-                    f"Clean={state['cleanliness']:.1f}"
-                )
+
+                if csv_writer:
+                    csv_writer.writerow([
+                        state["tick"],
+                        state["park_money"],
+                        state["cleanliness"],
+                        state["visitor_count"],
+                        state["avg_satisfaction"],
+                        state["avg_nausea"],
+                        state["avg_hunger"],
+                        state["attraction_count"],
+                        ";".join(events) if events else "",
+                    ])
+
+                if verbose and self.tick_count % 60 == 0:
+                    print(
+                        f"[{state['tick']}] "
+                        f"Visitors={state['visitor_count']} "
+                        f"Sat={state['avg_satisfaction']:.1f} "
+                        f"Nausea={state['avg_nausea']:.1f} "
+                        f"Money={state['park_money']:.0f} "
+                        f"Clean={state['cleanliness']:.1f}"
+                    )
+        finally:
+            if csv_file:
+                csv_file.close()
+                print(f"Simulation CSV saved: {csv_path}")
 
         final = self.get_state()
         print(f"\nFinal state: {final}")
@@ -443,6 +481,12 @@ def main() -> None:
         action="store_true",
         help="Print state every 60 ticks",
     )
+    parser.add_argument(
+        "--csv-output",
+        type=Path,
+        default=None,
+        help="Export per-tick simulation state to CSV file",
+    )
     args = parser.parse_args()
 
     if args.from_gdd:
@@ -459,7 +503,7 @@ def main() -> None:
             ],
         )
 
-    sim.run(frames=args.frames, verbose=args.verbose)
+    sim.run(frames=args.frames, verbose=args.verbose, csv_path=args.csv_output)
 
 
 if __name__ == "__main__":
