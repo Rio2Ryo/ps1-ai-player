@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Game ISOs (large binary files)
+isos/*.iso
+isos/*.bin
+isos/*.cue
+isos/*.img
+
+# DuckStation binary
+duckstation/*.AppImage
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Captures (screenshots can be large)
+captures/*.png
+captures/*.jpg
+
+# Logs (generated at runtime)
+logs/*.csv
+logs/*.json
+
+# Generated reports (keep demo files)
+reports/causal_chains_*.json
+reports/GDD_*.md
+
+# Save states
+saves/

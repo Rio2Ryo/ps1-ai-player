@@ -25,6 +25,11 @@ MAX_API_RETRIES = 3
 RETRY_BACKOFF_BASE = 2.0  # seconds, doubles each retry
 DUCKSTATION_WAIT_TIMEOUT = 60  # seconds to wait for DuckStation to start
 DUCKSTATION_POLL_INTERVAL = 3  # seconds between PID checks
+ACTION_HISTORY_SIZE = 10  # number of recent steps to include as context
+
+# GPT-4o pricing per 1M tokens (as of 2024)
+COST_PER_1M_INPUT = 2.50
+COST_PER_1M_OUTPUT = 10.00
 
 import mss
 import mss.tools
@@ -34,6 +39,105 @@ from pynput.keyboard import Key
 
 from address_manager import AddressManager
 from memory_scanner import MemoryScanner
+
+
+# ---------------------------------------------------------------------------
+# Action History (sliding window for GPT-4o context)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ActionRecord:
+    """One step of agent history."""
+
+    step: int
+    action: list[str]
+    reasoning: str
+    observations: str
+    parameters: dict[str, Any] = field(default_factory=dict)
+
+
+class ActionHistory:
+    """Maintains a sliding window of recent agent actions for GPT-4o context."""
+
+    def __init__(self, max_size: int = ACTION_HISTORY_SIZE) -> None:
+        self._max_size = max_size
+        self._records: list[ActionRecord] = []
+
+    def add(self, record: ActionRecord) -> None:
+        self._records.append(record)
+        if len(self._records) > self._max_size:
+            self._records = self._records[-self._max_size:]
+
+    def format_for_prompt(self) -> str:
+        """Format history as text for the GPT-4o system prompt."""
+        if not self._records:
+            return ""
+
+        lines = [f"Recent action history (last {len(self._records)} steps):"]
+        for rec in self._records:
+            action_str = ", ".join(rec.action) if rec.action else "none"
+            param_str = ""
+            if rec.parameters:
+                param_parts = [f"{k}={v}" for k, v in rec.parameters.items()]
+                param_str = f" | Params: {', '.join(param_parts)}"
+            lines.append(
+                f"  Step {rec.step}: [{action_str}] "
+                f"Reason: {rec.reasoning[:80]}"
+                f"{param_str}"
+            )
+        return "\n".join(lines)
+
+    @property
+    def records(self) -> list[ActionRecord]:
+        return list(self._records)
+
+
+# ---------------------------------------------------------------------------
+# API Cost Tracker
+# ---------------------------------------------------------------------------
+
+class CostTracker:
+    """Track OpenAI API token usage and estimated costs."""
+
+    def __init__(self) -> None:
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.step_costs: list[dict[str, Any]] = []
+
+    def record(self, step: int, input_tokens: int, output_tokens: int) -> float:
+        """Record token usage for one API call. Returns estimated cost in USD."""
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        cost = (
+            input_tokens / 1_000_000 * COST_PER_1M_INPUT
+            + output_tokens / 1_000_000 * COST_PER_1M_OUTPUT
+        )
+        self.step_costs.append({
+            "step": step,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cost_usd": round(cost, 6),
+        })
+        return cost
+
+    @property
+    def total_cost(self) -> float:
+        return (
+            self.total_input_tokens / 1_000_000 * COST_PER_1M_INPUT
+            + self.total_output_tokens / 1_000_000 * COST_PER_1M_OUTPUT
+        )
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_cost_usd": round(self.total_cost, 4),
+            "api_calls": len(self.step_costs),
+            "avg_cost_per_call": round(
+                self.total_cost / max(len(self.step_costs), 1), 6
+            ),
+        }
+
 
 # ---------------------------------------------------------------------------
 # Screen Capture
@@ -122,6 +226,7 @@ class GPT4VAnalyzer:
         strategy: str = "balanced",
         parameters: dict[str, Any] | None = None,
         detail: str = "low",
+        history: ActionHistory | None = None,
     ) -> dict[str, Any]:
         """Send screenshot to GPT-4o Vision and get action instructions.
 
@@ -131,14 +236,19 @@ class GPT4VAnalyzer:
             strategy: Current strategy mode.
             parameters: Current memory parameter values.
             detail: "low" or "high" for Vision API detail level.
+            history: Recent action history for context.
 
         Returns:
-            Dict with 'action' (key sequence), 'reasoning', and 'observations'.
+            Dict with 'action', 'reasoning', 'observations', and token usage.
         """
         param_text = ""
         if parameters:
             param_lines = [f"  {k}: {v}" for k, v in parameters.items()]
             param_text = "\nCurrent parameters:\n" + "\n".join(param_lines)
+
+        history_text = ""
+        if history:
+            history_text = "\n" + history.format_for_prompt() + "\n"
 
         system_prompt = (
             "You are an AI playing a PS1 game via DuckStation emulator. "
@@ -158,6 +268,10 @@ class GPT4VAnalyzer:
             "  s: Triangle\n"
             "  enter: Start\n"
             "  space: Select\n\n"
+            "IMPORTANT: Review the action history below. "
+            "Avoid repeating the same action if it didn't produce a change. "
+            "If parameters are stagnant, try a different approach.\n"
+            f"{history_text}\n"
             "Respond in JSON format:\n"
             '{\n  "action": ["key1", "key2", ...],\n'
             '  "reasoning": "why this action",\n'
@@ -212,6 +326,11 @@ class GPT4VAnalyzer:
 
         raw = response.choices[0].message.content or "{}"
 
+        # Capture token usage
+        usage = response.usage
+        input_tokens = usage.prompt_tokens if usage else 0
+        output_tokens = usage.completion_tokens if usage else 0
+
         # Parse JSON from response (handle markdown code blocks)
         json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
         if json_match:
@@ -226,6 +345,8 @@ class GPT4VAnalyzer:
                 "observations": raw,
             }
 
+        result["_input_tokens"] = input_tokens
+        result["_output_tokens"] = output_tokens
         return result
 
 
@@ -470,6 +591,8 @@ class AIAgent:
         keyboard = KeyboardController()
         memory = MemoryReader(self.game_id)
         logger = GameLogger(self.game_id)
+        history = ActionHistory()
+        cost_tracker = CostTracker()
 
         self._running = True
         consecutive_errors = 0
@@ -486,6 +609,7 @@ class AIAgent:
         print(f"Strategy: {self.strategy}")
         print(f"Detail: {self.detail}")
         print(f"Interval: {self.interval}s")
+        print(f"History window: {ACTION_HISTORY_SIZE} steps")
         print(f"Log: {logger.log_path}")
         print("Press Ctrl+C to stop.\n")
 
@@ -517,7 +641,7 @@ class AIAgent:
                 except Exception as e:
                     print(f"Memory read error (non-fatal): {e}")
 
-                # 3. GPT-4o Vision analysis (retry is inside analyze_screen)
+                # 3. GPT-4o Vision analysis with action history
                 context = f"Step {self._step}, strategy={self.strategy}"
                 result = analyzer.analyze_screen(
                     image_b64,
@@ -525,20 +649,40 @@ class AIAgent:
                     strategy=self.strategy,
                     parameters=params,
                     detail=self.detail,
+                    history=history,
                 )
 
                 action = result.get("action", [])
                 reasoning = result.get("reasoning", "")
                 observations = result.get("observations", "")
 
+                # Track API cost
+                input_tokens = result.pop("_input_tokens", 0)
+                output_tokens = result.pop("_output_tokens", 0)
+                step_cost = cost_tracker.record(self._step, input_tokens, output_tokens)
+
                 print(f"Action: {action}")
                 print(f"Reason: {reasoning}")
+                print(
+                    f"Cost: ${step_cost:.4f} "
+                    f"(total: ${cost_tracker.total_cost:.4f}, "
+                    f"{cost_tracker.total_input_tokens}+{cost_tracker.total_output_tokens} tokens)"
+                )
 
                 # 4. Execute actions
                 if action:
                     keyboard.press_sequence(action)
 
-                # 5. Log
+                # 5. Record to history
+                history.add(ActionRecord(
+                    step=self._step,
+                    action=action,
+                    reasoning=reasoning,
+                    observations=observations,
+                    parameters=dict(params),
+                ))
+
+                # 6. Log
                 logger.log(self._step, action, reasoning, observations, params)
 
                 time.sleep(self.interval)
@@ -546,8 +690,20 @@ class AIAgent:
         finally:
             memory.close()
             logger.close()
+
+            # Save cost summary
+            cost_summary = cost_tracker.summary()
             print(f"\nAgent stopped after {self._step} steps.")
             print(f"Log saved to: {logger.log_path}")
+            print(f"API cost: ${cost_summary['total_cost_usd']:.4f} "
+                  f"({cost_summary['api_calls']} calls, "
+                  f"avg ${cost_summary['avg_cost_per_call']:.6f}/call)")
+
+            # Write cost summary JSON next to the log
+            import json as _json
+            cost_path = logger.log_path.with_suffix(".cost.json")
+            cost_path.write_text(_json.dumps(cost_summary, indent=2))
+            print(f"Cost summary: {cost_path}")
 
 
 # ---------------------------------------------------------------------------
