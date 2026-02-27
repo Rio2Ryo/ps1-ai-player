@@ -125,9 +125,12 @@ def _generate_local_gdd(generator: GDDGenerator, game_id: str) -> str:
         param_section += f"| {p} | {role} |\n"
     param_section += "\n"
 
-    # Mechanics + balance from generator
+    # Mechanics, balance, feedback loops, state analysis, strategy from generator
     mechanics = generator.generate_mechanics_section()
     balance = generator.generate_balance_section()
+    feedback_loops = generator.generate_feedback_loops_section()
+    state_analysis = generator.generate_state_analysis_section()
+    strategy_config = generator.generate_strategy_section()
 
     # Implementation priority
     priority = "## Implementation Priority\n\n"
@@ -147,7 +150,15 @@ def _generate_local_gdd(generator: GDDGenerator, game_id: str) -> str:
         )
     priority += "\n"
 
-    return header + overview + param_section + mechanics + "\n" + balance + "\n" + priority
+    return (
+        header + overview + param_section
+        + mechanics + "\n"
+        + balance + "\n"
+        + feedback_loops + "\n"
+        + state_analysis + "\n"
+        + strategy_config + "\n"
+        + priority
+    )
 
 
 def run_simulation(

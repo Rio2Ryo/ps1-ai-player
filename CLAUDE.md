@@ -4,7 +4,8 @@
 
 Autonomous PS1 game player using DuckStation emulator + GPT-4o Vision.
 Reads game memory via `/proc/PID/mem`, extracts causal chains from gameplay data,
-and auto-generates Game Design Documents (GDD).
+and auto-generates Game Design Documents (GDD). Features adaptive strategy switching,
+game state tracking, and real-time parameter trend analysis.
 
 ## Architecture
 
@@ -14,11 +15,17 @@ run.sh (orchestrator)
   ├── DuckStation         (PS1 emulator, AppImage)
   ├── memory_logger.py    (CSV logging from /proc/PID/mem)
   ├── ai_agent.py         (GPT-4o Vision → keyboard input)
+  │   ├── GameStateTracker      (screen classification: menu/gameplay/dialog/loading/pause)
+  │   ├── ParameterTrendAnalyzer (rising/falling/stable/volatile detection)
+  │   └── AdaptiveStrategyEngine (dynamic strategy switching on param thresholds)
   └── pipeline.py         (auto-runs after session: analysis → GDD → charts)
 
 pipeline.py (post-session analysis)
   ├── data_analyzer.py    (correlation + lag analysis → causal chains JSON)
   ├── gdd_generator.py    (causal chains → GDD markdown, local or LLM)
+  │   ├── Feedback loop detection (positive/negative loop analysis)
+  │   ├── Game state analysis section
+  │   └── Adaptive strategy configuration docs
   ├── visualizer.py       (matplotlib: heatmap, time-series, causal graph)
   └── game_prototype.py   (GDD → Python simulation → CSV export)
 ```
@@ -43,7 +50,7 @@ pipeline.py (post-session analysis)
 | `log_config.py` | Shared Python logging configuration |
 | `run.sh` | Master launcher (Xvfb → DuckStation → logger → agent → pipeline) |
 | `sample_data/generate_sample.py` | Standalone synthetic data generator (stdlib-only) |
-| `tests/` | pytest suite (31 tests) |
+| `tests/` | pytest suite (70 tests) |
 | `pyproject.toml` | Project metadata + pytest configuration |
 
 ## Dev Commands
@@ -88,11 +95,17 @@ python lua_generator.py --game SLPM-86023
 - **Memory detection**: 4-pass strategy in `_find_ps1_ram_offset()` parsing `/proc/PID/maps`
 - **API retry**: Exponential backoff (2s base, 3 retries) in `GPT4VAnalyzer.analyze_screen()`
 - **Action history**: Sliding window of last 10 actions sent as context to GPT-4o
-- **Cost tracking**: Token usage tracked per step, .cost.json saved alongside logs
+- **Cost tracking**: Token usage tracked per step, .session.json saved alongside logs
 - **Key mapping**: Arrow=D-pad, Z=Circle, X=Cross, A=Square, S=Triangle, Enter=Start, Space=Select
 - **pynput caveat**: Requires X11 at import time — use `importlib.util.find_spec()` for headless checks
 - **Local GDD**: pipeline.py can generate full GDD without API key (statistical analysis only)
 - **Auto-pipeline**: run.sh automatically runs analysis + visualization after agent session
+- **Game state tracking**: `GameStateTracker` classifies screens (menu/gameplay/dialog/loading/pause) via keyword matching on GPT-4o observations + parameter change detection
+- **Parameter trends**: `ParameterTrendAnalyzer` with sliding window (20 steps) detects rising/falling/stable/volatile trends and significant jumps
+- **Adaptive strategy**: `AdaptiveStrategyEngine` switches strategy based on parameter thresholds (e.g., money<1000 → cost_reduction). Priority-ordered evaluation, JSON-configurable per game
+- **Loading state skip**: Agent skips keyboard input during GAME_STATE_LOADING to avoid wasted actions
+- **GDD feedback loops**: `gdd_generator.py` detects positive/negative feedback loops from lag correlation adjacency
+- **Session summary**: Agent saves .session.json with cost, game_state transitions, and strategy switch history
 
 ## Environment
 

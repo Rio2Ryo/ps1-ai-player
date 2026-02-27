@@ -2,7 +2,8 @@
 """Auto-generate Game Design Documents from extracted causal chains.
 
 Reads causal chain JSON files produced by data_analyzer.py and uses
-GPT-4 to generate comprehensive GDD in Markdown format.
+GPT-4 to generate comprehensive GDD in Markdown format. Supports both
+LLM-enhanced and local-only (statistical) generation modes.
 """
 
 from __future__ import annotations
@@ -13,6 +14,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from log_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class GDDGenerator:
@@ -36,7 +41,7 @@ class GDDGenerator:
             "parameters": data.get("parameters", []),
             "lag_correlations": data.get("lag_correlations", {}),
         }
-        print(f"Loaded {len(self.chains)} causal chains from {json_path.name}")
+        logger.info("Loaded %d causal chains from %s", len(self.chains), json_path.name)
 
     def generate_mechanics_section(self) -> str:
         """Generate the game mechanics section from causal chains.
@@ -115,6 +120,135 @@ class GDDGenerator:
         lines.append("")
         return "\n".join(lines)
 
+    def generate_feedback_loops_section(self) -> str:
+        """Generate a section documenting positive/negative feedback loops.
+
+        Analyzes causal chains for circular dependencies and reinforcing patterns.
+
+        Returns:
+            Markdown text for the feedback loops section.
+        """
+        lines = ["## Feedback Loops\n"]
+        lag_corrs = self.metadata.get("lag_correlations", {})
+
+        if not lag_corrs:
+            lines.append("No feedback loops detected (insufficient lag correlation data).\n")
+            return "\n".join(lines)
+
+        # Build adjacency from lag correlations to find loops
+        edges: dict[str, list[tuple[str, float]]] = {}
+        for _key, data in lag_corrs.items():
+            src = data.get("source", "")
+            tgt = data.get("target", "")
+            corr = data.get("correlation", 0)
+            if src and tgt:
+                edges.setdefault(src, []).append((tgt, corr))
+
+        # Detect 2-node cycles (A→B and B→A)
+        positive_loops: list[str] = []
+        negative_loops: list[str] = []
+        seen_pairs: set[tuple[str, str]] = set()
+
+        for src, targets in edges.items():
+            for tgt, corr_ab in targets:
+                if (tgt, src) in seen_pairs:
+                    continue
+                if tgt in edges:
+                    for back_tgt, corr_ba in edges[tgt]:
+                        if back_tgt == src:
+                            seen_pairs.add((src, tgt))
+                            loop_type = "positive" if corr_ab * corr_ba > 0 else "negative"
+                            desc = (
+                                f"- **{src} ↔ {tgt}**: "
+                                f"{src}→{tgt} (r={corr_ab:.3f}), "
+                                f"{tgt}→{src} (r={corr_ba:.3f}) "
+                                f"— {loop_type} feedback"
+                            )
+                            if loop_type == "positive":
+                                positive_loops.append(desc)
+                            else:
+                                negative_loops.append(desc)
+
+        if positive_loops:
+            lines.append("### Positive (Reinforcing) Loops\n")
+            lines.append("These loops amplify changes — can lead to runaway growth or collapse:\n")
+            lines.extend(positive_loops)
+            lines.append("")
+
+        if negative_loops:
+            lines.append("### Negative (Balancing) Loops\n")
+            lines.append("These loops counteract changes — create stability and equilibrium:\n")
+            lines.extend(negative_loops)
+            lines.append("")
+
+        if not positive_loops and not negative_loops:
+            lines.append("No circular feedback loops detected between parameters.\n")
+            lines.append("All causal relationships appear to be unidirectional.\n")
+
+        return "\n".join(lines)
+
+    def generate_state_analysis_section(self) -> str:
+        """Generate a section about game state transitions and phases.
+
+        Returns:
+            Markdown text for the state analysis section.
+        """
+        lines = ["## Game State Analysis\n"]
+
+        lines.append("### Expected Game States\n")
+        lines.append("The AI agent should recognize and handle these game states:\n")
+        lines.append("| State | Description | Recommended Action |")
+        lines.append("|-------|-------------|--------------------|")
+        lines.append("| Menu | Title/option selection screens | Navigate with D-pad, confirm with Circle |")
+        lines.append("| Gameplay | Active game simulation | Execute strategy-based actions |")
+        lines.append("| Dialog | NPC/event text boxes | Advance with Circle, read content |")
+        lines.append("| Loading | Screen transitions | Wait, no input needed |")
+        lines.append("| Pause | Game paused | Resume with Start or navigate pause menu |")
+        lines.append("")
+
+        lines.append("### State Transition Patterns\n")
+        lines.append("Common transitions observed in PS1 management/simulation games:\n")
+        lines.append("- Menu → Loading → Gameplay (game start)")
+        lines.append("- Gameplay → Dialog → Gameplay (event trigger)")
+        lines.append("- Gameplay → Pause → Gameplay (player pause)")
+        lines.append("- Gameplay → Menu (game over / exit)")
+        lines.append("")
+
+        return "\n".join(lines)
+
+    def generate_strategy_section(self) -> str:
+        """Generate a section documenting adaptive strategy thresholds.
+
+        Returns:
+            Markdown text for the strategy section.
+        """
+        lines = ["## Adaptive Strategy Configuration\n"]
+
+        lines.append("### Strategy Modes\n")
+        lines.append("| Strategy | Trigger Condition | Focus |")
+        lines.append("|----------|-------------------|-------|")
+        lines.append("| expansion | money > 8000, visitors < 15 | Build new attractions, grow park |")
+        lines.append("| satisfaction | satisfaction < 30, nausea > 70 | Improve visitor comfort |")
+        lines.append("| cost_reduction | money < 1000 | Reduce expenses, optimize revenue |")
+        lines.append("| exploration | No specific trigger | Discover new areas and actions |")
+        lines.append("| balanced | Default / no threshold active | Adaptive switching |")
+        lines.append("")
+
+        lines.append("### Threshold Customization\n")
+        lines.append("Strategy thresholds can be customized per game via JSON config:\n")
+        lines.append("```json")
+        lines.append(json.dumps({
+            "thresholds": [
+                {"parameter": "money", "operator": "lt", "value": 1000,
+                 "target_strategy": "cost_reduction", "priority": 10},
+                {"parameter": "satisfaction", "operator": "lt", "value": 30,
+                 "target_strategy": "satisfaction", "priority": 9},
+            ]
+        }, indent=2))
+        lines.append("```\n")
+
+        return "\n".join(lines)
+
     def generate_full_gdd(
         self,
         game_id: str = "UNKNOWN",
@@ -146,12 +280,16 @@ class GDDGenerator:
             "3. パラメーター定義 (Parameter Definitions)\n"
             "4. 因果関係 (Causal Relationships)\n"
             "5. バランス設計 (Balance Design)\n"
-            "6. 実装優先度 (Implementation Priority)\n\n"
+            "6. フィードバックループ (Feedback Loops)\n"
+            "7. ゲーム状態遷移 (Game State Transitions)\n"
+            "8. AI戦略設定 (AI Strategy Configuration)\n"
+            "9. 実装優先度 (Implementation Priority)\n\n"
             f"## 因果チェーンデータ\n```json\n{chains_json}\n```\n\n"
             f"## メタデータ\n```json\n{metadata_json}\n```\n\n"
             "Markdown形式で完全なGDDを生成してください。日本語で記述してください。"
         )
 
+        logger.info("Requesting LLM-generated GDD for %s...", game_id)
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
@@ -160,6 +298,7 @@ class GDDGenerator:
         )
 
         llm_gdd = response.choices[0].message.content or ""
+        logger.info("LLM GDD received (%d chars).", len(llm_gdd))
 
         # Combine locally generated sections with LLM output
         header = (
@@ -173,6 +312,9 @@ class GDDGenerator:
         local_sections = (
             self.generate_mechanics_section() + "\n"
             + self.generate_balance_section() + "\n"
+            + self.generate_feedback_loops_section() + "\n"
+            + self.generate_state_analysis_section() + "\n"
+            + self.generate_strategy_section() + "\n"
         )
 
         gdd = (
@@ -210,7 +352,7 @@ class GDDGenerator:
         filename = f"GDD_{game_id}_{timestamp}.md"
         output_path = output_dir / filename
         output_path.write_text(gdd_content)
-        print(f"GDD saved to: {output_path}")
+        logger.info("GDD saved to: %s", output_path)
         return output_path
 
 

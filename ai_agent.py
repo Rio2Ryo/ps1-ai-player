@@ -31,10 +31,19 @@ RETRY_BACKOFF_BASE = 2.0  # seconds, doubles each retry
 DUCKSTATION_WAIT_TIMEOUT = 60  # seconds to wait for DuckStation to start
 DUCKSTATION_POLL_INTERVAL = 3  # seconds between PID checks
 ACTION_HISTORY_SIZE = 10  # number of recent steps to include as context
+TREND_WINDOW_SIZE = 20  # number of steps to track for trend analysis
 
 # GPT-4o pricing per 1M tokens (as of 2024)
 COST_PER_1M_INPUT = 2.50
 COST_PER_1M_OUTPUT = 10.00
+
+# Game state classification labels
+GAME_STATE_MENU = "menu"
+GAME_STATE_GAMEPLAY = "gameplay"
+GAME_STATE_DIALOG = "dialog"
+GAME_STATE_LOADING = "loading"
+GAME_STATE_PAUSE = "pause"
+GAME_STATE_UNKNOWN = "unknown"
 
 import mss
 import mss.tools
@@ -145,6 +154,445 @@ class CostTracker:
 
 
 # ---------------------------------------------------------------------------
+# Game State Tracker
+# ---------------------------------------------------------------------------
+
+class GameStateTracker:
+    """Track game screen state transitions for context-aware AI decisions.
+
+    Classifies screens into states (menu, gameplay, dialog, loading, pause)
+    based on GPT-4o observations and parameter change patterns. Maintains
+    a state transition history for the AI prompt.
+    """
+
+    def __init__(self, max_history: int = 20) -> None:
+        self._current_state: str = GAME_STATE_UNKNOWN
+        self._previous_state: str = GAME_STATE_UNKNOWN
+        self._state_history: list[dict[str, Any]] = []
+        self._max_history = max_history
+        self._state_duration: int = 0  # ticks in current state
+        self._transition_counts: dict[str, int] = {}
+
+    @property
+    def current_state(self) -> str:
+        return self._current_state
+
+    @property
+    def state_duration(self) -> int:
+        return self._state_duration
+
+    def classify_state(
+        self,
+        observations: str,
+        params_changed: bool,
+        action_had_effect: bool,
+    ) -> str:
+        """Classify the current game state from observations and parameter data.
+
+        Args:
+            observations: GPT-4o observation text from the current step.
+            params_changed: Whether any memory parameters changed since last step.
+            action_had_effect: Whether the last action produced visible change.
+
+        Returns:
+            Classified state string.
+        """
+        obs_lower = observations.lower()
+
+        # Keyword-based classification from GPT-4o observations
+        if any(kw in obs_lower for kw in ("loading", "please wait", "now loading")):
+            return GAME_STATE_LOADING
+        if any(kw in obs_lower for kw in ("pause", "paused", "resume")):
+            return GAME_STATE_PAUSE
+        if any(kw in obs_lower for kw in (
+            "menu", "option", "select", "cursor", "choice", "title screen",
+            "start game", "new game", "continue", "save", "load",
+        )):
+            return GAME_STATE_MENU
+        if any(kw in obs_lower for kw in (
+            "dialog", "dialogue", "speech", "text box", "conversation",
+            "character speaking", "npc",
+        )):
+            return GAME_STATE_DIALOG
+
+        # If parameters are changing, likely in active gameplay
+        if params_changed:
+            return GAME_STATE_GAMEPLAY
+
+        # If no params changed and no action effect, could be loading or stuck
+        if not action_had_effect and not params_changed:
+            # If we've been stuck for a while, might be loading
+            if self._state_duration > 3 and self._current_state == GAME_STATE_UNKNOWN:
+                return GAME_STATE_LOADING
+            return self._current_state  # Keep current state
+
+        return GAME_STATE_GAMEPLAY
+
+    def update(
+        self,
+        step: int,
+        observations: str,
+        params_changed: bool,
+        action_had_effect: bool,
+    ) -> str:
+        """Update state tracking with new step data.
+
+        Args:
+            step: Current step number.
+            observations: GPT-4o observation text.
+            params_changed: Whether parameters changed.
+            action_had_effect: Whether the action had visible effect.
+
+        Returns:
+            The new current state.
+        """
+        new_state = self.classify_state(observations, params_changed, action_had_effect)
+
+        if new_state != self._current_state:
+            self._previous_state = self._current_state
+            transition_key = f"{self._current_state}->{new_state}"
+            self._transition_counts[transition_key] = (
+                self._transition_counts.get(transition_key, 0) + 1
+            )
+            self._state_history.append({
+                "step": step,
+                "from": self._current_state,
+                "to": new_state,
+                "duration": self._state_duration,
+            })
+            if len(self._state_history) > self._max_history:
+                self._state_history = self._state_history[-self._max_history:]
+            self._current_state = new_state
+            self._state_duration = 0
+            logger.info("State transition: %s -> %s (step %d)", self._previous_state, new_state, step)
+        else:
+            self._state_duration += 1
+
+        return self._current_state
+
+    def format_for_prompt(self) -> str:
+        """Format state info for the GPT-4o system prompt."""
+        lines = [f"Current game state: {self._current_state} (for {self._state_duration} steps)"]
+        if self._previous_state != GAME_STATE_UNKNOWN:
+            lines.append(f"Previous state: {self._previous_state}")
+
+        # State-specific hints
+        if self._current_state == GAME_STATE_MENU:
+            lines.append("Hint: Navigate with D-pad, confirm with Z/Circle.")
+        elif self._current_state == GAME_STATE_DIALOG:
+            lines.append("Hint: Advance dialog with Z/Circle, skip with X/Cross.")
+        elif self._current_state == GAME_STATE_LOADING:
+            lines.append("Hint: Wait for loading to complete. No action needed.")
+        elif self._current_state == GAME_STATE_PAUSE:
+            lines.append("Hint: Press Start to resume, or navigate pause menu.")
+
+        if self._state_duration > 5 and self._current_state == GAME_STATE_GAMEPLAY:
+            lines.append(
+                f"Note: Been in gameplay for {self._state_duration} steps. "
+                "Consider changing strategy if parameters are stagnant."
+            )
+
+        return "\n".join(lines)
+
+    def summary(self) -> dict[str, Any]:
+        """Return a summary dict for logging/serialization."""
+        return {
+            "current_state": self._current_state,
+            "state_duration": self._state_duration,
+            "transitions": len(self._state_history),
+            "transition_counts": dict(self._transition_counts),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Parameter Trend Analyzer
+# ---------------------------------------------------------------------------
+
+class ParameterTrendAnalyzer:
+    """Analyze real-time parameter trends to detect changes and stagnation.
+
+    Tracks a sliding window of parameter values and computes:
+    - Direction: rising / falling / stable / volatile
+    - Velocity: rate of change per step
+    - Significant changes: jumps that exceed a threshold
+    """
+
+    def __init__(self, window_size: int = TREND_WINDOW_SIZE) -> None:
+        self._window_size = window_size
+        self._history: dict[str, list[float]] = {}
+        self._previous: dict[str, float] = {}
+
+    def record(self, params: dict[str, int | float]) -> dict[str, dict[str, Any]]:
+        """Record a new set of parameter values and compute trends.
+
+        Args:
+            params: Current parameter name→value mapping.
+
+        Returns:
+            Dict mapping parameter name to trend info dict.
+        """
+        trends: dict[str, dict[str, Any]] = {}
+
+        for name, value in params.items():
+            fval = float(value)
+
+            if name not in self._history:
+                self._history[name] = []
+
+            self._history[name].append(fval)
+            if len(self._history[name]) > self._window_size:
+                self._history[name] = self._history[name][-self._window_size:]
+
+            history = self._history[name]
+            prev = self._previous.get(name)
+
+            # Compute delta
+            delta = fval - prev if prev is not None else 0.0
+
+            # Compute trend direction from window
+            direction = "stable"
+            velocity = 0.0
+            if len(history) >= 3:
+                diffs = [history[i] - history[i - 1] for i in range(1, len(history))]
+                velocity = sum(diffs) / len(diffs)
+                positive = sum(1 for d in diffs if d > 0)
+                negative = sum(1 for d in diffs if d < 0)
+                total = len(diffs)
+
+                if positive > total * 0.6:
+                    direction = "rising"
+                elif negative > total * 0.6:
+                    direction = "falling"
+                elif positive > total * 0.3 and negative > total * 0.3:
+                    direction = "volatile"
+                else:
+                    direction = "stable"
+
+            # Detect significant jumps (> 10% of range or > 5 absolute)
+            significant = False
+            if len(history) >= 2:
+                val_range = max(history) - min(history)
+                threshold = max(val_range * 0.1, 5.0)
+                if abs(delta) > threshold:
+                    significant = True
+
+            trends[name] = {
+                "value": fval,
+                "delta": round(delta, 2),
+                "direction": direction,
+                "velocity": round(velocity, 2),
+                "significant_change": significant,
+                "window_size": len(history),
+            }
+
+            self._previous[name] = fval
+
+        return trends
+
+    def format_for_prompt(self, trends: dict[str, dict[str, Any]]) -> str:
+        """Format trend analysis for the GPT-4o system prompt.
+
+        Args:
+            trends: Output from record().
+
+        Returns:
+            Human-readable trend summary.
+        """
+        if not trends:
+            return ""
+
+        lines = ["Parameter trends:"]
+        alerts = []
+
+        for name, info in trends.items():
+            arrow = {
+                "rising": "↑",
+                "falling": "↓",
+                "stable": "→",
+                "volatile": "~",
+            }.get(info["direction"], "?")
+            delta_str = f"{info['delta']:+.1f}" if info["delta"] != 0 else "0"
+            lines.append(
+                f"  {name}: {info['value']:.0f} {arrow} ({delta_str}/step, {info['direction']})"
+            )
+            if info["significant_change"]:
+                alerts.append(f"  ⚠ {name} changed significantly: {info['delta']:+.1f}")
+
+        if alerts:
+            lines.append("Alerts:")
+            lines.extend(alerts)
+
+        return "\n".join(lines)
+
+    def params_changed(self, trends: dict[str, dict[str, Any]]) -> bool:
+        """Check if any parameter changed from last step."""
+        return any(info["delta"] != 0 for info in trends.values())
+
+    def get_stagnant_params(self, trends: dict[str, dict[str, Any]]) -> list[str]:
+        """Return parameter names that have been stable for the full window."""
+        return [
+            name for name, info in trends.items()
+            if info["direction"] == "stable" and info["window_size"] >= self._window_size
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Adaptive Strategy Engine
+# ---------------------------------------------------------------------------
+
+@dataclass
+class StrategyThreshold:
+    """A threshold condition that triggers a strategy switch."""
+    parameter: str
+    operator: str  # "lt", "gt", "le", "ge"
+    value: float
+    target_strategy: str
+    priority: int = 0  # higher = evaluated first
+
+    def evaluate(self, params: dict[str, int | float]) -> bool:
+        """Check if this threshold is triggered by the current params."""
+        if self.parameter not in params:
+            return False
+        pval = float(params[self.parameter])
+        if self.operator == "lt":
+            return pval < self.value
+        elif self.operator == "gt":
+            return pval > self.value
+        elif self.operator == "le":
+            return pval <= self.value
+        elif self.operator == "ge":
+            return pval >= self.value
+        return False
+
+
+class AdaptiveStrategyEngine:
+    """Dynamically switch AI strategy based on game parameter thresholds.
+
+    When the agent runs in 'balanced' mode, this engine evaluates parameter
+    thresholds and selects the most appropriate strategy for the current
+    game state. Falls back to the configured default when no threshold fires.
+    """
+
+    # Default thresholds for theme park management games
+    DEFAULT_THRESHOLDS: list[dict[str, Any]] = [
+        {"parameter": "money", "operator": "lt", "value": 1000, "target_strategy": "cost_reduction", "priority": 10},
+        {"parameter": "satisfaction", "operator": "lt", "value": 30, "target_strategy": "satisfaction", "priority": 9},
+        {"parameter": "visitors", "operator": "lt", "value": 15, "target_strategy": "expansion", "priority": 7},
+        {"parameter": "nausea", "operator": "gt", "value": 70, "target_strategy": "satisfaction", "priority": 8},
+        {"parameter": "hunger", "operator": "gt", "value": 80, "target_strategy": "satisfaction", "priority": 6},
+        {"parameter": "money", "operator": "gt", "value": 8000, "target_strategy": "expansion", "priority": 5},
+    ]
+
+    def __init__(
+        self,
+        default_strategy: str = "balanced",
+        thresholds: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self._default_strategy = default_strategy
+        self._current_strategy = default_strategy
+        self._previous_strategy = default_strategy
+        self._switch_count = 0
+        self._strategy_history: list[dict[str, Any]] = []
+
+        raw = thresholds if thresholds is not None else self.DEFAULT_THRESHOLDS
+        self._thresholds = sorted(
+            [StrategyThreshold(**t) for t in raw],
+            key=lambda t: t.priority,
+            reverse=True,
+        )
+
+    @property
+    def current_strategy(self) -> str:
+        return self._current_strategy
+
+    def evaluate(
+        self, params: dict[str, int | float], step: int = 0
+    ) -> str:
+        """Evaluate thresholds and return the recommended strategy.
+
+        Args:
+            params: Current parameter values.
+            step: Current step number.
+
+        Returns:
+            Strategy string.
+        """
+        if not params:
+            return self._current_strategy
+
+        for threshold in self._thresholds:
+            if threshold.evaluate(params):
+                new_strategy = threshold.target_strategy
+                if new_strategy != self._current_strategy:
+                    self._previous_strategy = self._current_strategy
+                    self._current_strategy = new_strategy
+                    self._switch_count += 1
+                    self._strategy_history.append({
+                        "step": step,
+                        "from": self._previous_strategy,
+                        "to": new_strategy,
+                        "trigger": f"{threshold.parameter} {threshold.operator} {threshold.value}",
+                    })
+                    logger.info(
+                        "Strategy switch: %s -> %s (trigger: %s %s %.0f, step %d)",
+                        self._previous_strategy, new_strategy,
+                        threshold.parameter, threshold.operator, threshold.value, step,
+                    )
+                return self._current_strategy
+
+        # No threshold fired — revert to default
+        if self._current_strategy != self._default_strategy:
+            self._previous_strategy = self._current_strategy
+            self._current_strategy = self._default_strategy
+            self._switch_count += 1
+            self._strategy_history.append({
+                "step": step,
+                "from": self._previous_strategy,
+                "to": self._default_strategy,
+                "trigger": "no threshold active",
+            })
+            logger.info("Strategy reverted to %s (step %d)", self._default_strategy, step)
+
+        return self._current_strategy
+
+    def format_for_prompt(self) -> str:
+        """Format strategy info for the GPT-4o prompt."""
+        lines = [f"Active strategy: {self._current_strategy}"]
+        if self._previous_strategy != self._current_strategy:
+            lines.append(f"Previous strategy: {self._previous_strategy}")
+        if self._switch_count > 0:
+            lines.append(f"Total strategy switches: {self._switch_count}")
+        return "\n".join(lines)
+
+    def summary(self) -> dict[str, Any]:
+        """Return a summary dict for logging."""
+        return {
+            "current_strategy": self._current_strategy,
+            "default_strategy": self._default_strategy,
+            "switch_count": self._switch_count,
+            "history": self._strategy_history[-10:],
+        }
+
+    @classmethod
+    def from_json(cls, path: Path, default_strategy: str = "balanced") -> AdaptiveStrategyEngine:
+        """Load thresholds from a JSON config file.
+
+        Args:
+            path: Path to JSON file with threshold definitions.
+            default_strategy: Fallback strategy.
+
+        Returns:
+            Configured AdaptiveStrategyEngine.
+        """
+        import json as _json
+        data = _json.loads(path.read_text())
+        return cls(
+            default_strategy=default_strategy,
+            thresholds=data.get("thresholds", cls.DEFAULT_THRESHOLDS),
+        )
+
+
+# ---------------------------------------------------------------------------
 # Screen Capture
 # ---------------------------------------------------------------------------
 
@@ -232,6 +680,9 @@ class GPT4VAnalyzer:
         parameters: dict[str, Any] | None = None,
         detail: str = "low",
         history: ActionHistory | None = None,
+        game_state_text: str = "",
+        trend_text: str = "",
+        strategy_text: str = "",
     ) -> dict[str, Any]:
         """Send screenshot to GPT-4o Vision and get action instructions.
 
@@ -242,6 +693,9 @@ class GPT4VAnalyzer:
             parameters: Current memory parameter values.
             detail: "low" or "high" for Vision API detail level.
             history: Recent action history for context.
+            game_state_text: Formatted game state tracker info.
+            trend_text: Formatted parameter trend analysis.
+            strategy_text: Formatted adaptive strategy info.
 
         Returns:
             Dict with 'action', 'reasoning', 'observations', and token usage.
@@ -254,6 +708,15 @@ class GPT4VAnalyzer:
         history_text = ""
         if history:
             history_text = "\n" + history.format_for_prompt() + "\n"
+
+        # Build extended context sections
+        extended_context = ""
+        if game_state_text:
+            extended_context += "\n" + game_state_text + "\n"
+        if trend_text:
+            extended_context += "\n" + trend_text + "\n"
+        if strategy_text:
+            extended_context += "\n" + strategy_text + "\n"
 
         system_prompt = (
             "You are an AI playing a PS1 game via DuckStation emulator. "
@@ -273,9 +736,11 @@ class GPT4VAnalyzer:
             "  s: Triangle\n"
             "  enter: Start\n"
             "  space: Select\n\n"
-            "IMPORTANT: Review the action history below. "
+            "IMPORTANT: Review the action history and game state below. "
             "Avoid repeating the same action if it didn't produce a change. "
-            "If parameters are stagnant, try a different approach.\n"
+            "If parameters are stagnant, try a different approach. "
+            "Adapt your actions to the current game state (menu vs gameplay vs dialog).\n"
+            f"{extended_context}"
             f"{history_text}\n"
             "Respond in JSON format:\n"
             '{\n  "action": ["key1", "key2", ...],\n'
@@ -598,9 +1063,13 @@ class AIAgent:
         game_logger = GameLogger(self.game_id)
         history = ActionHistory()
         cost_tracker = CostTracker()
+        state_tracker = GameStateTracker()
+        trend_analyzer = ParameterTrendAnalyzer()
+        strategy_engine = AdaptiveStrategyEngine(default_strategy=self.strategy)
 
         self._running = True
         consecutive_errors = 0
+        last_observations = ""
 
         def stop(sig: int, frame: object) -> None:
             logger.info("Stopping agent...")
@@ -612,7 +1081,9 @@ class AIAgent:
         logger.info("=== AI Agent Started ===")
         logger.info("Game: %s | Strategy: %s | Detail: %s | Interval: %.1fs",
                      self.game_id, self.strategy, self.detail, self.interval)
-        logger.info("History window: %d steps", ACTION_HISTORY_SIZE)
+        logger.info("History window: %d steps | Trend window: %d steps",
+                     ACTION_HISTORY_SIZE, TREND_WINDOW_SIZE)
+        logger.info("Adaptive strategy: enabled (default: %s)", self.strategy)
         logger.info("Log: %s", game_logger.log_path)
 
         try:
@@ -643,20 +1114,51 @@ class AIAgent:
                 except Exception as e:
                     logger.debug("Memory read error (non-fatal): %s", e)
 
-                # 3. GPT-4o Vision analysis with action history
-                context = f"Step {self._step}, strategy={self.strategy}"
+                # 3. Analyze parameter trends
+                trends = trend_analyzer.record(params) if params else {}
+                trend_text = trend_analyzer.format_for_prompt(trends) if trends else ""
+                params_changed = trend_analyzer.params_changed(trends) if trends else False
+
+                if trends:
+                    stagnant = trend_analyzer.get_stagnant_params(trends)
+                    if stagnant:
+                        logger.debug("Stagnant params: %s", ", ".join(stagnant))
+
+                # 4. Update game state tracker
+                action_had_effect = params_changed or (last_observations != "" and self._step > 1)
+                game_state = state_tracker.update(
+                    step=self._step,
+                    observations=last_observations,
+                    params_changed=params_changed,
+                    action_had_effect=action_had_effect,
+                )
+                game_state_text = state_tracker.format_for_prompt()
+                logger.info("Game state: %s (duration: %d)", game_state, state_tracker.state_duration)
+
+                # 5. Adaptive strategy evaluation
+                active_strategy = strategy_engine.evaluate(params, step=self._step)
+                strategy_text = strategy_engine.format_for_prompt()
+                if active_strategy != self.strategy:
+                    logger.info("Active strategy: %s (base: %s)", active_strategy, self.strategy)
+
+                # 6. GPT-4o Vision analysis with full context
+                context = f"Step {self._step}, strategy={active_strategy}"
                 result = analyzer.analyze_screen(
                     image_b64,
                     context=context,
-                    strategy=self.strategy,
+                    strategy=active_strategy,
                     parameters=params,
                     detail=self.detail,
                     history=history,
+                    game_state_text=game_state_text,
+                    trend_text=trend_text,
+                    strategy_text=strategy_text,
                 )
 
                 action = result.get("action", [])
                 reasoning = result.get("reasoning", "")
                 observations = result.get("observations", "")
+                last_observations = observations
 
                 # Track API cost
                 input_tokens = result.pop("_input_tokens", 0)
@@ -671,11 +1173,13 @@ class AIAgent:
                     cost_tracker.total_input_tokens, cost_tracker.total_output_tokens,
                 )
 
-                # 4. Execute actions
-                if action:
+                # 7. Execute actions (skip during loading state)
+                if action and game_state != GAME_STATE_LOADING:
                     keyboard.press_sequence(action)
+                elif game_state == GAME_STATE_LOADING:
+                    logger.info("Loading state detected — skipping input.")
 
-                # 5. Record to history
+                # 8. Record to history
                 history.add(ActionRecord(
                     step=self._step,
                     action=action,
@@ -684,7 +1188,7 @@ class AIAgent:
                     parameters=dict(params),
                 ))
 
-                # 6. Log
+                # 9. Log
                 game_logger.log(self._step, action, reasoning, observations, params)
 
                 time.sleep(self.interval)
@@ -693,8 +1197,10 @@ class AIAgent:
             memory.close()
             game_logger.close()
 
-            # Save cost summary
+            # Save cost summary + session state
             cost_summary = cost_tracker.summary()
+            state_summary = state_tracker.summary()
+            strategy_summary = strategy_engine.summary()
             logger.info("Agent stopped after %d steps.", self._step)
             logger.info("Log saved to: %s", game_logger.log_path)
             logger.info(
@@ -703,12 +1209,23 @@ class AIAgent:
                 cost_summary['api_calls'],
                 cost_summary['avg_cost_per_call'],
             )
+            logger.info(
+                "State transitions: %d | Strategy switches: %d",
+                state_summary['transitions'],
+                strategy_summary['switch_count'],
+            )
 
-            # Write cost summary JSON next to the log
+            # Write session summary JSON next to the log
             import json as _json
-            cost_path = game_logger.log_path.with_suffix(".cost.json")
-            cost_path.write_text(_json.dumps(cost_summary, indent=2))
-            logger.info("Cost summary: %s", cost_path)
+            session_data = {
+                "cost": cost_summary,
+                "game_state": state_summary,
+                "strategy": strategy_summary,
+                "total_steps": self._step,
+            }
+            cost_path = game_logger.log_path.with_suffix(".session.json")
+            cost_path.write_text(_json.dumps(session_data, indent=2))
+            logger.info("Session summary: %s", cost_path)
 
 
 # ---------------------------------------------------------------------------
