@@ -683,6 +683,8 @@ class GPT4VAnalyzer:
         game_state_text: str = "",
         trend_text: str = "",
         strategy_text: str = "",
+        game_state: str = "",
+        lang_hint: str = "",
     ) -> dict[str, Any]:
         """Send screenshot to GPT-4o Vision and get action instructions.
 
@@ -696,6 +698,8 @@ class GPT4VAnalyzer:
             game_state_text: Formatted game state tracker info.
             trend_text: Formatted parameter trend analysis.
             strategy_text: Formatted adaptive strategy info.
+            game_state: Current game state label (e.g. "menu", "gameplay").
+            lang_hint: Language hint for the game (e.g. "ja", "en").
 
         Returns:
             Dict with 'action', 'reasoning', 'observations', and token usage.
@@ -718,6 +722,18 @@ class GPT4VAnalyzer:
         if strategy_text:
             extended_context += "\n" + strategy_text + "\n"
 
+        # Build language-awareness block
+        lang_block = (
+            "\nMulti-language support:\n"
+            "  The game screen may contain text in Japanese, English, or other languages.\n"
+            "  If Japanese text (kanji, hiragana, katakana) is visible, read and interpret it\n"
+            "  as part of your analysis — it often contains menu labels, dialog, item names,\n"
+            "  and status messages critical for decision-making.\n"
+            "  Include a brief translation or summary of any on-screen text in your observations.\n"
+        )
+        if lang_hint:
+            lang_block += f"  Language hint for this game: {lang_hint}\n"
+
         system_prompt = (
             "You are an AI playing a PS1 game via DuckStation emulator. "
             "Analyze the screenshot and decide what action to take.\n\n"
@@ -736,6 +752,7 @@ class GPT4VAnalyzer:
             "  s: Triangle\n"
             "  enter: Start\n"
             "  space: Select\n\n"
+            f"{lang_block}\n"
             "IMPORTANT: Review the action history and game state below. "
             "Avoid repeating the same action if it didn't produce a change. "
             "If parameters are stagnant, try a different approach. "
@@ -748,6 +765,15 @@ class GPT4VAnalyzer:
             '  "observations": "what I see on screen"\n}'
         )
 
+        # Build user prompt with game state and language context
+        user_text_parts = [f"Context: {context}"]
+        if game_state:
+            user_text_parts.append(f"Current game state: {game_state}")
+        if lang_hint:
+            user_text_parts.append(f"Game language: {lang_hint}")
+        user_text_parts.append(param_text)
+        user_text_parts.append("\nWhat action should I take? Respond in JSON.")
+
         user_content: list[dict[str, Any]] = [
             {
                 "type": "image_url",
@@ -758,8 +784,7 @@ class GPT4VAnalyzer:
             },
             {
                 "type": "text",
-                "text": f"Context: {context}\n{param_text}\n\n"
-                "What action should I take? Respond in JSON.",
+                "text": "\n".join(user_text_parts),
             },
         ]
 
@@ -806,15 +831,7 @@ class GPT4VAnalyzer:
         if json_match:
             raw = json_match.group(1)
 
-        try:
-            result = json.loads(raw)
-        except json.JSONDecodeError:
-            result = {
-                "action": [],
-                "reasoning": "Could not parse response",
-                "observations": raw,
-            }
-
+        result = _parse_and_validate_response(raw)
         result["_input_tokens"] = input_tokens
         result["_output_tokens"] = output_tokens
         return result
@@ -841,6 +858,95 @@ KEY_MAP: dict[str, Key | str] = {
     "e": "e",
     "r": "r",
 }
+
+VALID_KEYS: set[str] = set(KEY_MAP.keys())
+
+# Maximum number of actions in a single step to prevent runaway sequences
+_MAX_ACTIONS_PER_STEP = 10
+
+
+def _parse_and_validate_response(raw: str) -> dict[str, Any]:
+    """Parse a GPT-4o JSON response and validate its structure.
+
+    Guarantees the returned dict always contains:
+      - ``action``: ``list[str]`` of valid key names (invalid keys stripped)
+      - ``reasoning``: ``str``
+      - ``observations``: ``str``
+
+    Args:
+        raw: Raw response text (possibly JSON, possibly garbage).
+
+    Returns:
+        Validated result dict.
+    """
+    import json as _json
+
+    # --- 1. Attempt JSON decode ---
+    try:
+        parsed = _json.loads(raw)
+    except (ValueError, TypeError):
+        logger.warning("GPT response is not valid JSON; returning empty action.")
+        return {
+            "action": [],
+            "reasoning": "Could not parse response as JSON",
+            "observations": raw[:500] if raw else "",
+        }
+
+    if not isinstance(parsed, dict):
+        logger.warning("GPT response JSON is not a dict (got %s).", type(parsed).__name__)
+        return {
+            "action": [],
+            "reasoning": "Response JSON was not an object",
+            "observations": str(parsed)[:500],
+        }
+
+    # --- 2. Extract and coerce fields ---
+    action_raw = parsed.get("action", [])
+    reasoning = parsed.get("reasoning", "")
+    observations = parsed.get("observations", "")
+
+    # reasoning / observations must be strings
+    if not isinstance(reasoning, str):
+        reasoning = str(reasoning)
+    if not isinstance(observations, str):
+        observations = str(observations)
+
+    # --- 3. Validate action list ---
+    actions: list[str] = []
+
+    if isinstance(action_raw, str):
+        # GPT sometimes returns a single key as a string instead of a list
+        action_raw = [action_raw]
+
+    if isinstance(action_raw, list):
+        for item in action_raw:
+            if not isinstance(item, str):
+                logger.debug("Skipping non-string action item: %r", item)
+                continue
+            key = item.strip().lower()
+            if key in VALID_KEYS:
+                actions.append(key)
+            else:
+                logger.warning("Ignoring invalid key name from GPT: %r", item)
+    else:
+        logger.warning(
+            "action field is not a list or string (got %s); defaulting to empty.",
+            type(action_raw).__name__,
+        )
+
+    # Cap the number of actions to prevent absurdly long sequences
+    if len(actions) > _MAX_ACTIONS_PER_STEP:
+        logger.warning(
+            "GPT returned %d actions; truncating to %d.",
+            len(actions), _MAX_ACTIONS_PER_STEP,
+        )
+        actions = actions[:_MAX_ACTIONS_PER_STEP]
+
+    return {
+        "action": actions,
+        "reasoning": reasoning,
+        "observations": observations,
+    }
 
 
 class KeyboardController:
@@ -999,6 +1105,7 @@ class AIAgent:
     detail: str = "low"
     interval: float = 5.0
     api_key: str | None = None
+    lang_hint: str = ""
 
     _running: bool = field(default=False, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -1153,6 +1260,8 @@ class AIAgent:
                     game_state_text=game_state_text,
                     trend_text=trend_text,
                     strategy_text=strategy_text,
+                    game_state=game_state,
+                    lang_hint=getattr(self, "lang_hint", ""),
                 )
 
                 action = result.get("action", [])
@@ -1262,6 +1371,11 @@ def main() -> None:
         default=None,
         help="OpenAI API key (default: OPENAI_API_KEY env var)",
     )
+    parser.add_argument(
+        "--lang",
+        default="",
+        help="Language hint for the game (e.g. ja, en). Helps GPT-4o interpret on-screen text.",
+    )
     args = parser.parse_args()
 
     agent = AIAgent(
@@ -1270,6 +1384,7 @@ def main() -> None:
         detail=args.detail,
         interval=args.interval,
         api_key=args.openai_key,
+        lang_hint=args.lang,
     )
     agent.run()
 

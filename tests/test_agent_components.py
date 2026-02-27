@@ -22,10 +22,15 @@ from ai_agent import (
     ActionHistory,
     ActionRecord,
     AdaptiveStrategyEngine,
+    AIAgent,
     CostTracker,
     GameStateTracker,
+    GPT4VAnalyzer,
     ParameterTrendAnalyzer,
     StrategyThreshold,
+    VALID_KEYS,
+    _MAX_ACTIONS_PER_STEP,
+    _parse_and_validate_response,
     GAME_STATE_GAMEPLAY,
     GAME_STATE_LOADING,
     GAME_STATE_MENU,
@@ -304,3 +309,242 @@ class TestAdaptiveStrategyEngine:
         result = engine.evaluate({"money": 500, "satisfaction": 20}, step=1)
         # money has higher priority, so cost_reduction wins
         assert result == "cost_reduction"
+
+
+class TestParseAndValidateResponse:
+    """Tests for _parse_and_validate_response()."""
+
+    def test_valid_json(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": ["up", "z"],
+            "reasoning": "Navigate menu",
+            "observations": "Title screen",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["up", "z"]
+        assert result["reasoning"] == "Navigate menu"
+        assert result["observations"] == "Title screen"
+
+    def test_invalid_json_returns_empty_action(self) -> None:
+        result = _parse_and_validate_response("not json at all")
+        assert result["action"] == []
+        assert "Could not parse" in result["reasoning"]
+        assert "not json" in result["observations"]
+
+    def test_empty_string(self) -> None:
+        result = _parse_and_validate_response("")
+        assert result["action"] == []
+
+    def test_json_array_instead_of_object(self) -> None:
+        result = _parse_and_validate_response('[1, 2, 3]')
+        assert result["action"] == []
+        assert "not an object" in result["reasoning"]
+
+    def test_invalid_key_names_stripped(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": ["up", "banana", "z", "fly_away", "down"],
+            "reasoning": "test",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["up", "z", "down"]
+
+    def test_action_as_single_string(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": "up",
+            "reasoning": "go up",
+            "observations": "screen",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["up"]
+
+    def test_action_as_single_invalid_string(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": "jump",
+            "reasoning": "go up",
+            "observations": "screen",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == []
+
+    def test_missing_fields_use_defaults(self) -> None:
+        result = _parse_and_validate_response("{}")
+        assert result["action"] == []
+        assert result["reasoning"] == ""
+        assert result["observations"] == ""
+
+    def test_non_string_reasoning_coerced(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": ["z"],
+            "reasoning": 42,
+            "observations": None,
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["z"]
+        assert result["reasoning"] == "42"
+        assert result["observations"] == "None"
+
+    def test_non_string_items_in_action_list_skipped(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": ["up", 123, None, "down"],
+            "reasoning": "test",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["up", "down"]
+
+    def test_action_is_integer_defaults_to_empty(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": 999,
+            "reasoning": "test",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == []
+
+    def test_truncation_of_long_action_list(self) -> None:
+        import json
+        long_actions = ["up"] * (_MAX_ACTIONS_PER_STEP + 5)
+        raw = json.dumps({
+            "action": long_actions,
+            "reasoning": "spam",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        assert len(result["action"]) == _MAX_ACTIONS_PER_STEP
+
+    def test_case_insensitive_key_matching(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": ["UP", "Down", "Z", "ENTER"],
+            "reasoning": "test",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["up", "down", "z", "enter"]
+
+    def test_whitespace_in_key_names_stripped(self) -> None:
+        import json
+        raw = json.dumps({
+            "action": [" up ", "  z"],
+            "reasoning": "test",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        assert result["action"] == ["up", "z"]
+
+    def test_all_valid_keys_accepted(self) -> None:
+        import json
+        all_keys = sorted(VALID_KEYS)
+        raw = json.dumps({
+            "action": all_keys,
+            "reasoning": "test all",
+            "observations": "test",
+        })
+        result = _parse_and_validate_response(raw)
+        # May be truncated to _MAX_ACTIONS_PER_STEP, but every returned
+        # key must be valid and none should have been rejected.
+        expected = all_keys[:_MAX_ACTIONS_PER_STEP]
+        assert result["action"] == expected
+
+
+# ------------------------------------------------------------------
+# GPT4VAnalyzer multi-language prompt tests
+# ------------------------------------------------------------------
+
+
+class TestGPT4VAnalyzerMultiLang:
+    """Tests for multi-language support in GPT4VAnalyzer.analyze_screen()."""
+
+    def _make_analyzer(self):
+        """Create a GPT4VAnalyzer with a mocked OpenAI client."""
+        analyzer = GPT4VAnalyzer.__new__(GPT4VAnalyzer)
+        # Create a mock client that records the messages sent
+        mock_client = mock.MagicMock()
+        mock_response = mock.MagicMock()
+        mock_response.choices = [mock.MagicMock()]
+        mock_response.choices[0].message.content = '{"action": ["z"], "reasoning": "test", "observations": "test"}'
+        mock_response.usage.prompt_tokens = 100
+        mock_response.usage.completion_tokens = 50
+        mock_client.chat.completions.create.return_value = mock_response
+        analyzer.client = mock_client
+        return analyzer, mock_client
+
+    def _get_messages(self, mock_client):
+        """Extract messages from the mock client call."""
+        call_args = mock_client.chat.completions.create.call_args
+        return call_args.kwargs["messages"]
+
+    def test_system_prompt_always_has_multi_language_block(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test")
+        messages = self._get_messages(mock_client)
+        system = messages[0]["content"]
+        assert "Multi-language support:" in system
+        assert "Japanese text (kanji, hiragana, katakana)" in system
+        assert "brief translation or summary" in system
+
+    def test_system_prompt_includes_lang_hint(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test", lang_hint="ja")
+        messages = self._get_messages(mock_client)
+        system = messages[0]["content"]
+        assert "Language hint for this game: ja" in system
+
+    def test_system_prompt_no_lang_hint_when_empty(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test")
+        messages = self._get_messages(mock_client)
+        system = messages[0]["content"]
+        assert "Language hint for this game" not in system
+
+    def test_user_prompt_includes_game_state(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test", game_state="menu")
+        messages = self._get_messages(mock_client)
+        user_parts = messages[1]["content"]
+        user_text = user_parts[1]["text"]
+        assert "Current game state: menu" in user_text
+
+    def test_user_prompt_includes_lang_hint(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test", lang_hint="ja")
+        messages = self._get_messages(mock_client)
+        user_parts = messages[1]["content"]
+        user_text = user_parts[1]["text"]
+        assert "Game language: ja" in user_text
+
+    def test_user_prompt_no_game_state_when_empty(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test")
+        messages = self._get_messages(mock_client)
+        user_parts = messages[1]["content"]
+        user_text = user_parts[1]["text"]
+        assert "Current game state:" not in user_text
+
+    def test_user_prompt_no_lang_when_empty(self) -> None:
+        analyzer, mock_client = self._make_analyzer()
+        analyzer.analyze_screen(image_b64="dGVzdA==", context="test")
+        messages = self._get_messages(mock_client)
+        user_parts = messages[1]["content"]
+        user_text = user_parts[1]["text"]
+        assert "Game language:" not in user_text
+
+
+class TestAIAgentLangHint:
+    """Tests for AIAgent lang_hint field."""
+
+    def test_default_lang_hint_empty(self) -> None:
+        agent = AIAgent(game_id="TEST")
+        assert agent.lang_hint == ""
+
+    def test_lang_hint_set(self) -> None:
+        agent = AIAgent(game_id="TEST", lang_hint="ja")
+        assert agent.lang_hint == "ja"

@@ -8,9 +8,7 @@ command. Supports both local-only (no API key) and LLM-enhanced modes.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,8 +60,21 @@ def generate_gdd(
     game_id: str,
     api_key: str | None = None,
     use_llm: bool = False,
+    extractor: CausalChainExtractor | None = None,
+    lang: str = "ja",
 ) -> tuple[str, Path]:
     """Step 2: Generate GDD from causal chains.
+
+    Args:
+        chains_path: Path to saved causal-chains JSON.
+        game_id: Game identifier.
+        api_key: Optional OpenAI API key.
+        use_llm: Whether to use LLM-enhanced generation.
+        extractor: If provided, the raw DataFrame is forwarded to the
+            generator so that data-quality and event-analysis sections
+            can inspect per-row data (missing values, outliers, action
+            frequency).
+        lang: Language for LLM-generated GDD (``"ja"`` or ``"en"``).
 
     Returns:
         Tuple of (GDD content, path to saved file).
@@ -75,90 +86,19 @@ def generate_gdd(
     generator = GDDGenerator()
     generator.load_causal_chains(chains_path)
 
+    # Forward the raw DataFrame so sections that need row-level data
+    # (data quality, event analysis) work inside the pipeline flow.
+    if extractor is not None and not extractor.df.empty:
+        generator.raw_df = extractor.df
+
     if use_llm and api_key:
-        gdd_content = generator.generate_full_gdd(game_id=game_id, api_key=api_key)
+        gdd_content = generator.generate_full_gdd(game_id=game_id, api_key=api_key, lang=lang)
     else:
-        gdd_content = _generate_local_gdd(generator, game_id)
+        gdd_content = generator.generate_local_gdd(game_id=game_id)
 
     gdd_path = generator.save_gdd(gdd_content, game_id=game_id)
     logger.info("GDD generated: %s", gdd_path)
     return gdd_content, gdd_path
-
-
-def _generate_local_gdd(generator: GDDGenerator, game_id: str) -> str:
-    """Generate a GDD using only local data (no API key required).
-
-    Produces a complete GDD from statistical analysis without LLM assistance.
-    """
-    header = (
-        f"# Game Design Document: {game_id}\n\n"
-        f"Generated: {datetime.now().isoformat()}\n"
-        f"Data samples: {generator.metadata.get('total_samples', 'N/A')}\n"
-        f"Causal chains: {len(generator.chains)}\n"
-        f"Mode: Local analysis (no LLM)\n\n"
-        "---\n\n"
-    )
-
-    # Overview
-    overview = "## Overview\n\n"
-    params = generator.metadata.get("parameters", [])
-    overview += (
-        f"This GDD was auto-generated from gameplay data analysis of a PS1 game.\n"
-        f"The analysis tracked {len(params)} parameters: "
-        f"{', '.join(params)}.\n\n"
-    )
-
-    # Parameter definitions
-    param_section = "## Parameter Definitions\n\n"
-    param_section += "| Parameter | Role |\n"
-    param_section += "|-----------|------|\n"
-    param_roles = {
-        "money": "Primary resource / economy indicator",
-        "visitors": "Population / demand metric",
-        "satisfaction": "Quality of experience indicator",
-        "nausea": "Negative status effect from high-intensity rides",
-        "hunger": "Time-dependent need requiring food purchase",
-        "ride_intensity": "Attraction excitement level / risk factor",
-    }
-    for p in params:
-        role = param_roles.get(p, "Game parameter")
-        param_section += f"| {p} | {role} |\n"
-    param_section += "\n"
-
-    # Mechanics, balance, feedback loops, state analysis, strategy from generator
-    mechanics = generator.generate_mechanics_section()
-    balance = generator.generate_balance_section()
-    feedback_loops = generator.generate_feedback_loops_section()
-    state_analysis = generator.generate_state_analysis_section()
-    strategy_config = generator.generate_strategy_section()
-
-    # Implementation priority
-    priority = "## Implementation Priority\n\n"
-    priority += "Based on causal chain confidence scores:\n\n"
-    sorted_chains = sorted(
-        generator.chains,
-        key=lambda c: c.get("confidence", 0),
-        reverse=True,
-    )
-    for i, chain in enumerate(sorted_chains, 1):
-        trigger = chain.get("trigger", "Unknown")
-        conf = chain.get("confidence", 0)
-        n_effects = len(chain.get("effects", []))
-        priority += (
-            f"{i}. **{trigger}** — confidence {conf:.0%}, "
-            f"{n_effects} downstream effects\n"
-        )
-    priority += "\n"
-
-    return (
-        header + overview + param_section
-        + mechanics + "\n"
-        + balance + "\n"
-        + feedback_loops + "\n"
-        + state_analysis + "\n"
-        + strategy_config + "\n"
-        + priority
-    )
 
 
 def run_simulation(
@@ -230,6 +170,12 @@ def main() -> None:
         help="Skip the simulation step",
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--lang",
+        choices=["ja", "en"],
+        default="ja",
+        help="Language for LLM-generated GDD (default: ja)",
+    )
 
     args = parser.parse_args()
 
@@ -251,6 +197,8 @@ def main() -> None:
         game_id=args.game,
         api_key=api_key,
         use_llm=args.llm and bool(api_key),
+        extractor=extractor,
+        lang=args.lang,
     )
 
     # Step 3: Simulation

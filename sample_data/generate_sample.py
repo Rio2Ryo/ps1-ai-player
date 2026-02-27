@@ -8,6 +8,7 @@ Produces a CSV with correlated parameters that mimic real PS1 game behavior:
   - hunger increases steadily, resets on food purchase
   - money tracks income from visitors minus expenses
   - visitors fluctuate based on satisfaction
+  - action column records what the player did each tick
 
 Output: sample_data/sample_log.csv (720 rows = 1 hour at 5s intervals)
 """
@@ -97,6 +98,24 @@ def generate(
         food_cost = 12.0 if food_purchased else 0.0
         money = money + income - ride_cost - food_cost + random.gauss(0, 5)
 
+        # --- action: what the player did this tick ---
+        if food_purchased:
+            action = "buy_food"
+        elif ride_intensity > 70:
+            action = random.choice(["build_ride", "upgrade_ride", "adjust_intensity"])
+        elif satisfaction < 30:
+            action = random.choice(["lower_price", "clean_park", "add_bench"])
+        elif nausea > 60:
+            action = random.choice(["reduce_intensity", "add_first_aid"])
+        elif money > 7000:
+            action = random.choice(["build_ride", "build_shop", "expand_park"])
+        else:
+            action = random.choice([
+                "observe", "observe", "observe",  # most common
+                "adjust_intensity", "set_price", "hire_staff",
+                "check_finances", "inspect_ride",
+            ])
+
         rows.append([
             ts.isoformat(),
             frame,
@@ -106,11 +125,12 @@ def generate(
             round(nausea, 1),
             round(hunger, 1),
             round(ride_intensity, 1),
+            action,
         ])
 
     # Write CSV
     header = ["timestamp", "frame", "money", "visitors", "satisfaction",
-              "nausea", "hunger", "ride_intensity"]
+              "nausea", "hunger", "ride_intensity", "action"]
 
     with open(output_path, "w", newline="") as f:
         writer = csv.writer(f)

@@ -296,6 +296,16 @@ class CausalChainExtractor:
             "parameters": self._numeric_cols if hasattr(self, "_numeric_cols") else [],
             "chains": self.causal_chains,
             "lag_correlations": self.lag_correlations,
+            "descriptive_statistics": (
+                self.df[self._numeric_cols].describe().to_dict()
+                if hasattr(self, "_numeric_cols") and self._numeric_cols
+                else {}
+            ),
+            "correlation_matrix": (
+                self.correlations.to_dict()
+                if not self.correlations.empty
+                else {}
+            ),
         }
 
         output_path.write_text(json.dumps(data, indent=2, ensure_ascii=False))

@@ -32,18 +32,35 @@ DUCKSTATION_DIR="${PROJECT_DIR}/duckstation"
 mkdir -p "${DUCKSTATION_DIR}"
 
 if [ ! -f "${DUCKSTATION_DIR}/DuckStation.AppImage" ]; then
-    DOWNLOAD_URL=$(curl -sL -o /dev/null -w '%{url_effective}' \
-        "https://github.com/stenzek/duckstation/releases/latest" | \
-        sed 's|/tag/|/download/|')
-    APPIMAGE_URL="${DOWNLOAD_URL}/DuckStation-x64.AppImage"
+    # Use GitHub releases API to find the x64 AppImage asset URL dynamically.
+    # This avoids fragile URL construction via redirects and sed.
+    API_URL="https://api.github.com/repos/stenzek/duckstation/releases/latest"
+    echo "Querying GitHub releases API..."
 
-    echo "Downloading from: ${APPIMAGE_URL}"
-    wget -q --show-progress -O "${DUCKSTATION_DIR}/DuckStation.AppImage" "${APPIMAGE_URL}" || {
-        echo "Warning: Could not download DuckStation AppImage."
+    APPIMAGE_URL=$(curl -sfL "${API_URL}" | \
+        python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for asset in data.get('assets', []):
+    name = asset.get('name', '')
+    if 'x64' in name.lower() and name.endswith('.AppImage'):
+        print(asset['browser_download_url'])
+        break
+" 2>/dev/null) || true
+
+    if [ -z "${APPIMAGE_URL:-}" ]; then
+        echo "Warning: Could not determine AppImage URL from GitHub API."
         echo "Please download manually from https://github.com/stenzek/duckstation/releases"
         echo "and place it at ${DUCKSTATION_DIR}/DuckStation.AppImage"
-    }
-    chmod +x "${DUCKSTATION_DIR}/DuckStation.AppImage" 2>/dev/null || true
+    else
+        echo "Downloading from: ${APPIMAGE_URL}"
+        wget -q --show-progress -O "${DUCKSTATION_DIR}/DuckStation.AppImage" "${APPIMAGE_URL}" || {
+            echo "Warning: Could not download DuckStation AppImage."
+            echo "Please download manually from https://github.com/stenzek/duckstation/releases"
+            echo "and place it at ${DUCKSTATION_DIR}/DuckStation.AppImage"
+        }
+        chmod +x "${DUCKSTATION_DIR}/DuckStation.AppImage" 2>/dev/null || true
+    fi
 else
     echo "DuckStation AppImage already exists, skipping download."
 fi
