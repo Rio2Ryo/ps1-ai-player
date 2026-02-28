@@ -87,7 +87,10 @@ pipeline.py (post-session analysis)
 | `run.sh` | Master launcher (Xvfb → DuckStation → logger → agent → pipeline) |
 | `sample_data/generate_sample.py` | Standalone synthetic data generator (stdlib-only) |
 | `preflight_check.py` | E2E pre-flight checker (ISO/BIOS/DuckStation/venv/API key) |
-| `tests/` | pytest suite (282 tests) |
+| `demo_run.py` | E2E demo: sample data → analysis → GDD → charts → simulation (no API key needed) |
+| `sample_data/DEMO.json` | Demo memory address definitions (GameAddresses format) |
+| `sample_data/expected_output/` | Pre-generated pipeline outputs (GDD, causal chains) |
+| `tests/` | pytest suite (286 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `pyproject.toml` | Project metadata + pytest configuration |
 
@@ -175,3 +178,30 @@ python lua_generator.py --game SLPM-86023
 
 - Repo: https://github.com/Rio2Ryo/ps1-ai-player
 - Branch: master
+
+
+---
+
+## タスク完了後のプロトコル（必須・毎回実行）
+
+タスクが完了したら、次の指示を待つ前に**必ず以下を自分で実行**すること。
+
+### STEP 1: 自己評価
+コードベース・git log・テスト結果を自分で確認し、プロジェクトのゴールに対して「完成している機能」と「まだ足りないもの・改善すべきもの」を洗い出す。アオやRyoの指示を待たない。自分で考える。
+
+### STEP 2: status-report.md を更新
+~/status-report.md を最新状態に書き直す。完成済みはチェック、未実装・改善必要はHIGH/MEDIUM/LOW優先度付きで記載。
+
+### STEP 3: Telegramで次タスクを提案
+担当トピックに送信する形式:
+【[プロジェクト名] 完了 + 次タスク提案】
+✅ 今回完了: [やったこと]
+💡 次の提案:
+🔴 HIGH: [最重要タスク・理由]
+🟡 MEDIUM: [中優先・理由]
+🟢 LOW: [低優先・理由]
+⚠️ ブロッカー: [外部対応必要なもの]
+→ アオ確認後に実装開始します
+
+### STEP 4: 待機とフォールバック
+アオからの返信を受け取ってから実装開始。ただし30分以上返信がない場合はHIGHタスクを自律判断で開始してよい。

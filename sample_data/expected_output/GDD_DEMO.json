@@ -1,0 +1,366 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-28T10:05:15.660315",
+    "total_samples": 720,
+    "parameters": [
+      "money",
+      "visitors",
+      "satisfaction",
+      "nausea",
+      "hunger",
+      "ride_intensity"
+    ],
+    "lag_correlations": {
+      "money -> visitors": {
+        "source": "money",
+        "target": "visitors",
+        "lag": 10,
+        "correlation": -0.8288,
+        "p_value": 0.0
+      },
+      "visitors -> money": {
+        "source": "visitors",
+        "target": "money",
+        "lag": 1,
+        "correlation": -0.7227,
+        "p_value": 0.0
+      },
+      "money -> satisfaction": {
+        "source": "money",
+        "target": "satisfaction",
+        "lag": 10,
+        "correlation": -0.9094,
+        "p_value": 0.0
+      },
+      "satisfaction -> money": {
+        "source": "satisfaction",
+        "target": "money",
+        "lag": 1,
+        "correlation": -0.8826,
+        "p_value": 0.0
+      },
+      "money -> nausea": {
+        "source": "money",
+        "target": "nausea",
+        "lag": 10,
+        "correlation": -0.313,
+        "p_value": 0.0
+      },
+      "money -> ride_intensity": {
+        "source": "money",
+        "target": "ride_intensity",
+        "lag": 10,
+        "correlation": -0.3217,
+        "p_value": 0.0
+      },
+      "visitors -> satisfaction": {
+        "source": "visitors",
+        "target": "satisfaction",
+        "lag": 1,
+        "correlation": 0.8795,
+        "p_value": 0.0
+      },
+      "satisfaction -> visitors": {
+        "source": "satisfaction",
+        "target": "visitors",
+        "lag": 10,
+        "correlation": 0.9287,
+        "p_value": 0.0
+      },
+      "visitors -> nausea": {
+        "source": "visitors",
+        "target": "nausea",
+        "lag": 10,
+        "correlation": 0.4091,
+        "p_value": 0.0
+      },
+      "nausea -> visitors": {
+        "source": "nausea",
+        "target": "visitors",
+        "lag": 1,
+        "correlation": 0.3614,
+        "p_value": 0.0
+      },
+      "visitors -> ride_intensity": {
+        "source": "visitors",
+        "target": "ride_intensity",
+        "lag": 10,
+        "correlation": 0.4164,
+        "p_value": 0.0
+      },
+      "ride_intensity -> visitors": {
+        "source": "ride_intensity",
+        "target": "visitors",
+        "lag": 1,
+        "correlation": 0.3903,
+        "p_value": 0.0
+      },
+      "satisfaction -> ride_intensity": {
+        "source": "satisfaction",
+        "target": "ride_intensity",
+        "lag": 10,
+        "correlation": 0.3384,
+        "p_value": 0.0
+      },
+      "nausea -> ride_intensity": {
+        "source": "nausea",
+        "target": "ride_intensity",
+        "lag": 1,
+        "correlation": 0.9305,
+        "p_value": 0.0
+      },
+      "ride_intensity -> nausea": {
+        "source": "ride_intensity",
+        "target": "nausea",
+        "lag": 5,
+        "correlation": 0.9649,
+        "p_value": 0.0
+      }
+    }
+  },
+  "descriptive_statistics": {
+    "money": {
+      "count": 720.0,
+      "mean": 6194.409722222223,
+      "std": 276.34760248981695,
+      "min": 5003.0,
+      "25%": 6184.5,
+      "50%": 6273.0,
+      "75%": 6330.0,
+      "max": 6432.0
+    },
+    "visitors": {
+      "count": 720.0,
+      "mean": 18.81388888888889,
+      "std": 23.438288193103265,
+      "min": 10.0,
+      "25%": 10.0,
+      "50%": 10.0,
+      "75%": 10.0,
+      "max": 100.0
+    },
+    "satisfaction": {
+      "count": 720.0,
+      "mean": 16.232083333333335,
+      "std": 17.635619888131654,
+      "min": 5.0,
+      "25%": 6.1,
+      "50%": 10.5,
+      "75%": 16.1,
+      "max": 74.7
+    },
+    "nausea": {
+      "count": 720.0,
+      "mean": 27.774861111111115,
+      "std": 12.541755293815372,
+      "min": 3.9,
+      "25%": 14.8,
+      "50%": 28.4,
+      "75%": 39.5,
+      "max": 49.2
+    },
+    "hunger": {
+      "count": 720.0,
+      "mean": 41.761805555555554,
+      "std": 18.488807261524304,
+      "min": 8.6,
+      "25%": 25.849999999999998,
+      "50%": 40.849999999999994,
+      "75%": 57.9,
+      "max": 75.0
+    },
+    "ride_intensity": {
+      "count": 720.0,
+      "mean": 50.62986111111111,
+      "std": 22.144354699183943,
+      "min": 11.5,
+      "25%": 28.65,
+      "50%": 50.95,
+      "75%": 71.14999999999999,
+      "max": 87.3
+    }
+  },
+  "correlation_matrix": {
+    "money": {
+      "money": 1.0,
+      "visitors": -0.7306074407274903,
+      "satisfaction": -0.8867553262669781,
+      "nausea": -0.23405106941345621,
+      "hunger": 0.24672623200344748,
+      "ride_intensity": -0.2774238679994094
+    },
+    "visitors": {
+      "money": -0.7306074407274903,
+      "visitors": 1.0,
+      "satisfaction": 0.8847146505315459,
+      "nausea": 0.36509062426992406,
+      "hunger": -0.12923186611850113,
+      "ride_intensity": 0.39307944541701667
+    },
+    "satisfaction": {
+      "money": -0.8867553262669781,
+      "visitors": 0.8847146505315459,
+      "satisfaction": 1.0,
+      "nausea": 0.18315818123613126,
+      "hunger": -0.20357084581259705,
+      "ride_intensity": 0.254889075031767
+    },
+    "nausea": {
+      "money": -0.23405106941345621,
+      "visitors": 0.36509062426992406,
+      "satisfaction": 0.18315818123613126,
+      "nausea": 1.0,
+      "hunger": 0.23973509470712065,
+      "ride_intensity": 0.9352961732778301
+    },
+    "hunger": {
+      "money": 0.24672623200344748,
+      "visitors": -0.12923186611850113,
+      "satisfaction": -0.20357084581259705,
+      "nausea": 0.23973509470712065,
+      "hunger": 1.0,
+      "ride_intensity": 0.1940724776963009
+    },
+    "ride_intensity": {
+      "money": -0.2774238679994094,
+      "visitors": 0.39307944541701667,
+      "satisfaction": 0.254889075031767,
+      "nausea": 0.9352961732778301,
+      "hunger": 0.1940724776963009,
+      "ride_intensity": 1.0
+    }
+  },
+  "causal_chains": [
+    {
+      "trigger": "money change",
+      "effects": [
+        {
+          "parameter": "visitors",
+          "delta": "-0.59/step",
+          "lag_frames": 10,
+          "correlation": -0.8288
+        },
+        {
+          "parameter": "satisfaction",
+          "delta": "-0.90/step",
+          "lag_frames": 10,
+          "correlation": -0.9094
+        },
+        {
+          "parameter": "nausea",
+          "delta": "-0.13/step",
+          "lag_frames": 10,
+          "correlation": -0.313
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.38/step",
+          "lag_frames": 10,
+          "correlation": -0.3217
+        }
+      ],
+      "confidence": 0.5932
+    },
+    {
+      "trigger": "visitors change",
+      "effects": [
+        {
+          "parameter": "money",
+          "delta": "+1.99/step",
+          "lag_frames": 1,
+          "correlation": -0.7227
+        },
+        {
+          "parameter": "satisfaction",
+          "delta": "-0.08/step",
+          "lag_frames": 1,
+          "correlation": 0.8795
+        },
+        {
+          "parameter": "nausea",
+          "delta": "-0.13/step",
+          "lag_frames": 10,
+          "correlation": 0.4091
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.38/step",
+          "lag_frames": 10,
+          "correlation": 0.4164
+        }
+      ],
+      "confidence": 0.6069
+    },
+    {
+      "trigger": "satisfaction change",
+      "effects": [
+        {
+          "parameter": "money",
+          "delta": "+1.99/step",
+          "lag_frames": 1,
+          "correlation": -0.8826
+        },
+        {
+          "parameter": "visitors",
+          "delta": "-0.59/step",
+          "lag_frames": 10,
+          "correlation": 0.9287
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.38/step",
+          "lag_frames": 10,
+          "correlation": 0.3384
+        }
+      ],
+      "confidence": 0.7166
+    },
+    {
+      "trigger": "nausea change",
+      "effects": [
+        {
+          "parameter": "visitors",
+          "delta": "-0.06/step",
+          "lag_frames": 1,
+          "correlation": 0.3614
+        },
+        {
+          "parameter": "ride_intensity",
+          "delta": "-0.03/step",
+          "lag_frames": 1,
+          "correlation": 0.9305
+        }
+      ],
+      "confidence": 0.646
+    },
+    {
+      "trigger": "ride_intensity change",
+      "effects": [
+        {
+          "parameter": "visitors",
+          "delta": "-0.06/step",
+          "lag_frames": 1,
+          "correlation": 0.3903
+        },
+        {
+          "parameter": "nausea",
+          "delta": "-0.04/step",
+          "lag_frames": 5,
+          "correlation": 0.9649
+        }
+      ],
+      "confidence": 0.6776
+    }
+  ],
+  "sections": {
+    "mechanics": "## Core Mechanics\n\nThe following mechanics were extracted from gameplay data analysis:\n\n### Mechanic 1: money change\n**Confidence:** 59%\n\n**Effects:**\n\n- **visitors**: -0.59/step (delay: 10 frames)\n- **satisfaction**: -0.90/step (delay: 10 frames)\n- **nausea**: -0.13/step (delay: 10 frames)\n- **ride_intensity**: -0.38/step (delay: 10 frames)\n\n### Mechanic 2: visitors change\n**Confidence:** 61%\n\n**Effects:**\n\n- **money**: +1.99/step (delay: 1 frames)\n- **satisfaction**: -0.08/step (delay: 1 frames)\n- **nausea**: -0.13/step (delay: 10 frames)\n- **ride_intensity**: -0.38/step (delay: 10 frames)\n\n### Mechanic 3: satisfaction change\n**Confidence:** 72%\n\n**Effects:**\n\n- **money**: +1.99/step (delay: 1 frames)\n- **visitors**: -0.59/step (delay: 10 frames)\n- **ride_intensity**: -0.38/step (delay: 10 frames)\n\n### Mechanic 4: nausea change\n**Confidence:** 65%\n\n**Effects:**\n\n- **visitors**: -0.06/step (delay: 1 frames)\n- **ride_intensity**: -0.03/step (delay: 1 frames)\n\n### Mechanic 5: ride_intensity change\n**Confidence:** 68%\n\n**Effects:**\n\n- **visitors**: -0.06/step (delay: 1 frames)\n- **nausea**: -0.04/step (delay: 5 frames)\n",
+    "balance": "## Balance Design\n\n### Parameter Interactions\n\n| Source | Target | Lag | Correlation |\n|--------|--------|-----|-------------|\n| money | visitors | 10 | -0.829 |\n| visitors | money | 1 | -0.723 |\n| money | satisfaction | 10 | -0.909 |\n| satisfaction | money | 1 | -0.883 |\n| money | nausea | 10 | -0.313 |\n| money | ride_intensity | 10 | -0.322 |\n| visitors | satisfaction | 1 | 0.879 |\n| satisfaction | visitors | 10 | 0.929 |\n| visitors | nausea | 10 | 0.409 |\n| nausea | visitors | 1 | 0.361 |\n| visitors | ride_intensity | 10 | 0.416 |\n| ride_intensity | visitors | 1 | 0.390 |\n| satisfaction | ride_intensity | 10 | 0.338 |\n| nausea | ride_intensity | 1 | 0.930 |\n| ride_intensity | nausea | 5 | 0.965 |\n\n### Tuning Guidelines\n\nParameters should be balanced to create meaningful trade-offs. Key relationships identified:\n\n- **money change** (confidence: 59%)\n- **visitors change** (confidence: 61%)\n- **satisfaction change** (confidence: 72%)\n- **nausea change** (confidence: 65%)\n- **ride_intensity change** (confidence: 68%)\n",
+    "feedback_loops": "## Feedback Loops\n\n### Positive (Reinforcing) Loops\n\nThese loops amplify changes — can lead to runaway growth or collapse:\n\n- **money → ride_intensity → nausea → visitors → money**: money→ride_intensity (r=-0.322), ride_intensity→nausea (r=0.965), nausea→visitors (r=0.361), visitors→money (r=-0.723) — positive feedback\n- **money → ride_intensity → nausea → visitors → satisfaction → money**: money→ride_intensity (r=-0.322), ride_intensity→nausea (r=0.965), nausea→visitors (r=0.361), visitors→satisfaction (r=0.879), satisfaction→money (r=-0.883) — positive feedback\n- **money → ride_intensity → visitors → money**: money→ride_intensity (r=-0.322), ride_intensity→visitors (r=0.390), visitors→money (r=-0.723) — positive feedback\n- **money → ride_intensity → visitors → satisfaction → money**: money→ride_intensity (r=-0.322), ride_intensity→visitors (r=0.390), visitors→satisfaction (r=0.879), satisfaction→money (r=-0.883) — positive feedback\n- **money → nausea → ride_intensity → visitors → money**: money→nausea (r=-0.313), nausea→ride_intensity (r=0.930), ride_intensity→visitors (r=0.390), visitors→money (r=-0.723) — positive feedback\n- **money → nausea → ride_intensity → visitors → satisfaction → money**: money→nausea (r=-0.313), nausea→ride_intensity (r=0.930), ride_intensity→visitors (r=0.390), visitors→satisfaction (r=0.879), satisfaction→money (r=-0.883) — positive feedback\n- **money → nausea → visitors → money**: money→nausea (r=-0.313), nausea→visitors (r=0.361), visitors→money (r=-0.723) — positive feedback\n- **money → nausea → visitors → satisfaction → money**: money→nausea (r=-0.313), nausea→visitors (r=0.361), visitors→satisfaction (r=0.879), satisfaction→money (r=-0.883) — positive feedback\n- **money ↔ satisfaction**: money→satisfaction (r=-0.909), satisfaction→money (r=-0.883) — positive feedback\n- **money → satisfaction → ride_intensity → nausea → visitors → money**: money→satisfaction (r=-0.909), satisfaction→ride_intensity (r=0.338), ride_intensity→nausea (r=0.965), nausea→visitors (r=0.361), visitors→money (r=-0.723) — positive feedback\n- **money → satisfaction → ride_intensity → visitors → money**: money→satisfaction (r=-0.909), satisfaction→ride_intensity (r=0.338), ride_intensity→visitors (r=0.390), visitors→money (r=-0.723) — positive feedback\n- **money → satisfaction → visitors → money**: money→satisfaction (r=-0.909), satisfaction→visitors (r=0.929), visitors→money (r=-0.723) — positive feedback\n- **money ↔ visitors**: money→visitors (r=-0.829), visitors→money (r=-0.723) — positive feedback\n- **money → visitors → satisfaction → money**: money→visitors (r=-0.829), visitors→satisfaction (r=0.879), satisfaction→money (r=-0.883) — positive feedback\n- **nausea ↔ ride_intensity**: nausea→ride_intensity (r=0.930), ride_intensity→nausea (r=0.965) — positive feedback\n- **nausea → ride_intensity → visitors → nausea**: nausea→ride_intensity (r=0.930), ride_intensity→visitors (r=0.390), visitors→nausea (r=0.409) — positive feedback\n- **nausea ↔ visitors**: nausea→visitors (r=0.361), visitors→nausea (r=0.409) — positive feedback\n- **nausea → visitors → ride_intensity → nausea**: nausea→visitors (r=0.361), visitors→ride_intensity (r=0.416), ride_intensity→nausea (r=0.965) — positive feedback\n- **nausea → visitors → satisfaction → ride_intensity → nausea**: nausea→visitors (r=0.361), visitors→satisfaction (r=0.879), satisfaction→ride_intensity (r=0.338), ride_intensity→nausea (r=0.965) — positive feedback\n- **ride_intensity ↔ visitors**: ride_intensity→visitors (r=0.390), visitors→ride_intensity (r=0.416) — positive feedback\n- **ride_intensity → visitors → satisfaction → ride_intensity**: ride_intensity→visitors (r=0.390), visitors→satisfaction (r=0.879), satisfaction→ride_intensity (r=0.338) — positive feedback\n- **satisfaction ↔ visitors**: satisfaction→visitors (r=0.929), visitors→satisfaction (r=0.879) — positive feedback\n",
+    "statistics": "## Descriptive Statistics\n\n| Parameter | Min | Max | Mean | Std | Range |\n|-----------|-----|-----|------|-----|-------|\n| money | 5003.0 | 6432.0 | 6194.4 | 276.3 | 1429.0 |\n| visitors | 10.0 | 100.0 | 18.8 | 23.4 | 90.0 |\n| satisfaction | 5.0 | 74.7 | 16.2 | 17.6 | 69.7 |\n| nausea | 3.9 | 49.2 | 27.8 | 12.5 | 45.3 |\n| hunger | 8.6 | 75.0 | 41.8 | 18.5 | 66.4 |\n| ride_intensity | 11.5 | 87.3 | 50.6 | 22.1 | 75.8 |\n\n### Parameter Behavior Classification\n\n- **money**: Equilibrium metric (stable)\n- **visitors**: Volatile parameter (high std/mean ratio)\n- **satisfaction**: Volatile parameter (high std/mean ratio)\n- **nausea**: Cyclical status effect (oscillating)\n- **hunger**: Cyclical status effect (oscillating)\n- **ride_intensity**: Cyclical status effect (oscillating)\n",
+    "correlation_analysis": "## Correlation Matrix\n\n| Pair | r | Strength | Direction |\n|------|---|----------|-----------|\n| money ↔ visitors | -0.731 | Strong | Negative |\n| money ↔ satisfaction | -0.887 | Strong | Negative |\n| money ↔ nausea | -0.234 | Negligible | Negative |\n| money ↔ hunger | 0.247 | Negligible | Positive |\n| money ↔ ride_intensity | -0.277 | Negligible | Negative |\n| visitors ↔ satisfaction | 0.885 | Strong | Positive |\n| visitors ↔ nausea | 0.365 | Weak | Positive |\n| visitors ↔ hunger | -0.129 | Negligible | Negative |\n| visitors ↔ ride_intensity | 0.393 | Weak | Positive |\n| satisfaction ↔ nausea | 0.183 | Negligible | Positive |\n| satisfaction ↔ hunger | -0.204 | Negligible | Negative |\n| satisfaction ↔ ride_intensity | 0.255 | Negligible | Positive |\n| nausea ↔ hunger | 0.240 | Negligible | Positive |\n| nausea ↔ ride_intensity | 0.935 | Very strong | Positive |\n| hunger ↔ ride_intensity | 0.194 | Negligible | Positive |\n",
+    "data_quality": "## Data Quality Report\n\n- **Total samples:** 720\n- **Time range:** 2025-01-01 12:00:00 → 2025-01-01 12:59:55\n- **Duration:** 0 days 00:59:55\n\n### Missing Values\n\nNo missing values detected.\n\n\n### Outliers (IQR Method)\n\n- **money**: 67 outliers\n- **visitors**: 107 outliers\n- **satisfaction**: 87 outliers\n",
+    "event_analysis": "## Event / Action Analysis\n\nTotal recorded actions: **720**\n\n### Top Actions\n\n| Rank | Action | Count | Frequency |\n|------|--------|-------|-----------|\n| 1 | add_bench | 174 | 24.2% |\n| 2 | lower_price | 165 | 22.9% |\n| 3 | clean_park | 152 | 21.1% |\n| 4 | adjust_intensity | 79 | 11.0% |\n| 5 | upgrade_ride | 67 | 9.3% |\n| 6 | build_ride | 56 | 7.8% |\n| 7 | observe | 14 | 1.9% |\n| 8 | buy_food | 4 | 0.6% |\n| 9 | set_price | 3 | 0.4% |\n| 10 | check_finances | 2 | 0.3% |\n",
+    "state_analysis": "## Game State Analysis\n\n### Expected Game States\n\nThe AI agent should recognize and handle these game states:\n\n| State | Description | Recommended Action |\n|-------|-------------|--------------------|\n| Menu | Title/option selection screens | Navigate with D-pad, confirm with Circle |\n| Gameplay | Active game simulation | Execute strategy-based actions |\n| Dialog | NPC/event text boxes | Advance with Circle, read content |\n| Loading | Screen transitions | Wait, no input needed |\n| Pause | Game paused | Resume with Start or navigate pause menu |\n\n### State Transition Patterns\n\nCommon transitions observed in PS1 management/simulation games:\n\n- Menu → Loading → Gameplay (game start)\n- Gameplay → Dialog → Gameplay (event trigger)\n- Gameplay → Pause → Gameplay (player pause)\n- Gameplay → Menu (game over / exit)\n",
+    "strategy": "## Adaptive Strategy Configuration\n\n### Strategy Modes\n\n| Strategy | Trigger Condition | Focus |\n|----------|-------------------|-------|\n| expansion | money > 8000, visitors < 15 | Build new attractions, grow park |\n| satisfaction | satisfaction < 30, nausea > 70 | Improve visitor comfort |\n| cost_reduction | money < 1000 | Reduce expenses, optimize revenue |\n| exploration | No specific trigger | Discover new areas and actions |\n| balanced | Default / no threshold active | Adaptive switching |\n\n### Threshold Customization\n\nStrategy thresholds can be customized per game via JSON config:\n\n```json\n{\n  \"thresholds\": [\n    {\n      \"parameter\": \"money\",\n      \"operator\": \"lt\",\n      \"value\": 1000,\n      \"target_strategy\": \"cost_reduction\",\n      \"priority\": 10\n    },\n    {\n      \"parameter\": \"satisfaction\",\n      \"operator\": \"lt\",\n      \"value\": 30,\n      \"target_strategy\": \"satisfaction\",\n      \"priority\": 9\n    }\n  ]\n}\n```\n"
+  }
+}

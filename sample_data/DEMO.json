@@ -1,0 +1,35 @@
+{
+  "game_id": "DEMO",
+  "parameters": {
+    "money": {
+      "address": "0x001000",
+      "type": "int32",
+      "description": "所持金"
+    },
+    "visitors": {
+      "address": "0x001004",
+      "type": "int16",
+      "description": "来場者数"
+    },
+    "satisfaction": {
+      "address": "0x001008",
+      "type": "int8",
+      "description": "満足度(0-100)"
+    },
+    "nausea": {
+      "address": "0x00100C",
+      "type": "int8",
+      "description": "吐き気(0-100)"
+    },
+    "hunger": {
+      "address": "0x001010",
+      "type": "int8",
+      "description": "空腹度(0-100)"
+    },
+    "ride_intensity": {
+      "address": "0x001014",
+      "type": "int8",
+      "description": "ライド激しさ(0-100)"
+    }
+  }
+}

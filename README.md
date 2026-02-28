@@ -56,6 +56,68 @@ chmod +x setup.sh
 python setup_duckstation.py
 ```
 
+## Quick Start (5-Minute Demo)
+
+Try the analysis pipeline **without** DuckStation, PS1 ISOs, or an OpenAI API key.
+The only prerequisite is **Python 3.10+**.
+
+### Setup
+
+```bash
+git clone https://github.com/Rio2Ryo/ps1-ai-player.git
+cd ps1-ai-player
+pip install .
+```
+
+### Run the demo
+
+```bash
+python demo_run.py
+```
+
+### What happens
+
+1. Generates sample data (720 steps of a theme-park management game simulation)
+2. Extracts causal chains automatically (e.g. `ride_intensity → nausea → satisfaction`)
+3. Produces a full Game Design Document (GDD) in Markdown
+4. Renders visualizations — correlation heatmap, time-series, lag correlations, causal graph
+5. Runs a theme-park simulator driven by the extracted mechanics
+
+### Expected output
+
+All artifacts are written to `reports/demo/`:
+
+```
+reports/demo/
+  GDD_DEMO_*.md              — Game Design Document
+  causal_chains_*.json       — Extracted causal chains
+  correlation_heatmap.png    — Parameter correlation heatmap
+  time_series.png            — Parameter time-series plot
+  lag_correlations.png       — Lag correlation bar chart
+  causal_graph.png           — Causal relationship graph
+  sim_output.csv             — Simulation results (3 600 frames)
+```
+
+Sample console output:
+
+```
+[INFO] Generating sample data (720 steps)...
+[INFO] Running causal chain extraction...
+[INFO] Discovered 8 causal chains
+[INFO] Generating GDD (local mode)...
+[INFO] Rendering visualizations...
+[INFO] Running simulation (3600 frames)...
+[INFO] All outputs saved to reports/demo/
+```
+
+### Next steps
+
+To play real PS1 games with the AI agent you will need:
+
+- A **PS1 BIOS** image (see [PS1 BIOS Setup](#ps1-bios-setup))
+- A **game ISO** (see [ISO Preparation](#iso-preparation))
+- An **OpenAI API key** (see [AI Agent Execution](#ai-agent-execution))
+
 ## PS1 BIOS Setup
 
 DuckStation requires a PS1 BIOS image to run games. **BIOS files are not included
