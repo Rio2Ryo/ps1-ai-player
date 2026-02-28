@@ -7,6 +7,7 @@ Each game has its own JSON file in ~/ps1-ai-player/addresses/{game_id}.json.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from dataclasses import asdict, dataclass, field
@@ -143,6 +144,86 @@ class AddressManager:
             result[name] = (addr, info.type)
         return result
 
+    def export_addresses(self, game_id: str, path: Path, fmt: str = "json") -> Path:
+        """Export addresses to a JSON or CSV file.
+
+        Args:
+            game_id: Game ID to export.
+            path: Destination file path.
+            fmt: ``"json"`` or ``"csv"``.
+
+        Returns:
+            The path the data was written to.
+        """
+        ga = self.load(game_id)
+        path = Path(path)
+        if fmt == "json":
+            path.write_text(json.dumps(ga.to_dict(), indent=2, ensure_ascii=False))
+        elif fmt == "csv":
+            with open(path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["name", "address", "type", "description"])
+                for name, info in ga.parameters.items():
+                    writer.writerow([name, info.address, info.type, info.description])
+        else:
+            raise ValueError(f"Unsupported format: {fmt!r} (expected 'json' or 'csv')")
+        return path
+
+    def import_addresses(
+        self, game_id: str, path: Path, fmt: str | None = None, merge: bool = True
+    ) -> int:
+        """Import addresses from a JSON or CSV file.
+
+        Args:
+            game_id: Target game ID.
+            path: Source file path.
+            fmt: ``"json"``, ``"csv"``, or ``None`` (auto-detect from extension).
+            merge: If ``True``, merge with existing parameters (overwrite on name
+                collision). If ``False``, clear existing parameters first.
+
+        Returns:
+            The number of parameters imported.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Import file not found: {path}")
+
+        if fmt is None:
+            ext = path.suffix.lower()
+            if ext == ".json":
+                fmt = "json"
+            elif ext == ".csv":
+                fmt = "csv"
+            else:
+                raise ValueError(
+                    f"Cannot auto-detect format from extension {ext!r}. "
+                    "Specify fmt='json' or fmt='csv'."
+                )
+
+        imported_params: dict[str, ParameterInfo] = {}
+        if fmt == "json":
+            data = json.loads(path.read_text())
+            ga_imported = GameAddresses.from_dict(data)
+            imported_params = ga_imported.parameters
+        elif fmt == "csv":
+            with open(path, newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    imported_params[row["name"]] = ParameterInfo(
+                        address=row["address"],
+                        type=row["type"],
+                        description=row.get("description", ""),
+                    )
+        else:
+            raise ValueError(f"Unsupported format: {fmt!r} (expected 'json' or 'csv')")
+
+        ga = self.load(game_id)
+        if not merge:
+            ga.parameters.clear()
+        ga.parameters.update(imported_params)
+        self.save(ga)
+        return len(imported_params)
+
 
 def main() -> None:
     """CLI entry point."""
@@ -176,6 +257,35 @@ def main() -> None:
     # games
     subparsers.add_parser("games", help="List all games with saved addresses")
 
+    # export
+    export_parser = subparsers.add_parser("export", help="Export addresses to file")
+    export_parser.add_argument("path", type=Path, help="Output file path")
+    export_parser.add_argument(
+        "--format",
+        "-f",
+        dest="fmt",
+        choices=["json", "csv"],
+        default="json",
+        help="Output format (default: json)",
+    )
+
+    # import
+    import_parser = subparsers.add_parser("import", help="Import addresses from file")
+    import_parser.add_argument("path", type=Path, help="Input file path")
+    import_parser.add_argument(
+        "--format",
+        "-f",
+        dest="fmt",
+        choices=["json", "csv"],
+        default=None,
+        help="Input format (default: auto-detect from extension)",
+    )
+    import_parser.add_argument(
+        "--no-merge",
+        action="store_true",
+        help="Clear existing parameters before importing",
+    )
+
     args = parser.parse_args()
     manager = AddressManager(args.dir)
 
@@ -195,6 +305,15 @@ def main() -> None:
                 print(f"  {g}")
         else:
             print("No games found.")
+    elif args.action == "export":
+        out = manager.export_addresses(args.game, args.path, fmt=args.fmt)
+        print(f"Exported {args.game} to {out} (format: {args.fmt})")
+    elif args.action == "import":
+        count = manager.import_addresses(
+            args.game, args.path, fmt=args.fmt, merge=not args.no_merge
+        )
+        mode = "merge" if not args.no_merge else "replace"
+        print(f"Imported {count} parameters into {args.game} (mode: {mode})")
     else:
         parser.print_help()
 

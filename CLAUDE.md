@@ -1,3 +1,37 @@
+## 🤖 マルチエージェント【確定版・動作確認済み 2026-02-28】
+
+**kin で3エージェント並列実行を確認済み。必ずこのパターンを使うこと。**
+
+CLAUDE_BIN=/home/kiiocbot/.npm-global/bin/claude
+
+並列起動パターン（env -u CLAUDECODE が必須）:
+  env -u CLAUDECODE $CLAUDE_BIN --dangerously-skip-permissions -p 'タスク1' > /tmp/agent1.log 2>&1 &
+  PID1=$!
+  env -u CLAUDECODE $CLAUDE_BIN --dangerously-skip-permissions -p 'タスク2' > /tmp/agent2.log 2>&1 &
+  PID2=$!
+  env -u CLAUDECODE $CLAUDE_BIN --dangerously-skip-permissions -p 'タスク3' > /tmp/agent3.log 2>&1 &
+  PID3=$!
+  wait $PID1 $PID2 $PID3
+  cat /tmp/agent1.log /tmp/agent2.log /tmp/agent3.log
+
+なぜenv -u CLAUDECODEが必要か:
+Claude CodeはCLAUDECODE環境変数をセットする。子プロセスに残るとネスト起動が拒否される。
+env -u CLAUDECODEでその変数を除去してから起動することで解決。
+
+タスク分解パターン:
+- agent1: フロントエンド（UIコンポーネント・ページ）
+- agent2: バックエンド（API・DB・ビジネスロジック）
+- agent3: テスト（ユニット・E2E）
+→ wait → 統合 → commit
+
+ルール:
+1. 複数ファイルにまたがる実装は必ず並列起動
+2. 単独実行は1ファイル以内の小修正のみ
+3. プロンプトは具体的に（ファイルパス・実装内容・コードスタイルを含める）
+4. 完了報告に「何エージェントで並列実行したか」を明記
+
+---
+
 # CLAUDE.md — PS1 AI Player & Logic Extraction System
 
 ## Project Overview
@@ -53,7 +87,7 @@ pipeline.py (post-session analysis)
 | `run.sh` | Master launcher (Xvfb → DuckStation → logger → agent → pipeline) |
 | `sample_data/generate_sample.py` | Standalone synthetic data generator (stdlib-only) |
 | `preflight_check.py` | E2E pre-flight checker (ISO/BIOS/DuckStation/venv/API key) |
-| `tests/` | pytest suite (260 tests) |
+| `tests/` | pytest suite (282 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `pyproject.toml` | Project metadata + pytest configuration |
 
@@ -111,7 +145,7 @@ python lua_generator.py --game SLPM-86023
 - **Memory detection**: 4-pass strategy in `_find_ps1_ram_offset()` parsing `/proc/PID/maps`
 - **API retry**: Exponential backoff (2s base, 3 retries) in `GPT4VAnalyzer.analyze_screen()`
 - **GPT response validation**: `_parse_and_validate_response()` validates JSON structure, strips invalid key names against `VALID_KEYS`, coerces types, normalizes case, caps action count at 10
-- **Action history**: Sliding window of last 10 actions sent as context to GPT-4o
+- **Action history**: Sliding window of last 10 actions sent as context to GPT-4o. `save()`/`load()` for session resume via `--resume-history`
 - **Cost tracking**: Token usage tracked per step, .session.json saved alongside logs
 - **Key mapping**: Arrow=D-pad, Z=Circle, X=Cross, A=Square, S=Triangle, Enter=Start, Space=Select
 - **pynput caveat**: Requires X11 at import time — use `importlib.util.find_spec()` for headless checks
@@ -141,60 +175,3 @@ python lua_generator.py --game SLPM-86023
 
 - Repo: https://github.com/Rio2Ryo/ps1-ai-player
 - Branch: master
-
-## 🤖 マルチエージェント必須ルール（Ryo指示 2026-02-28）
-
-**複雑なタスクは必ずサブエージェントを並列起動して実装すること。シングルエージェントの直列実行は禁止。**
-
-### いつマルチエージェントを使うか
-- 新機能の実装（フロントエンド・バックエンド・テストを同時並行）
-- リファクタリング（複数ファイルの同時修正）
-- テスト作成（ユニット・E2E・統合テストを並列）
-- バグ修正 + テスト追加の組み合わせ
-
-### 使い方
-Bashツールで並列起動:
-```bash
-claude -p 'フロントエンドの実装' &
-claude -p 'バックエンドAPIの実装' &
-claude -p 'テスト作成' &
-wait
-```
-
-### 分担パターン
-- フロントエンド担当 / バックエンド担当 / テスト担当 / インフラ担当
-
-### ルール
-1. タスクを受け取ったらまず並列化できる単位に分解する
-2. 依存関係のないタスクは必ず並列実行する
-3. 全サブエージェント完了後に統合・コミットする
-4. 完了報告には「何エージェントで並列実行したか」を明記する
-
-## 🤖 マルチエージェント実装ガイド（修正版 2026-02-28）
-
-**重要: 以下のコマンドで実際にサブエージェントを並列起動できる。必ず使うこと。**
-
-```bash
-CLAUDE="/home/kiiocbot/.npm-global/bin/claude"
-
-# 並列実行例（バックグラウンドで同時起動）
-$CLAUDE --dangerously-skip-permissions -p 'フロントエンドの実装タスク' > /tmp/agent1.log 2>&1 &
-PID1=$!
-$CLAUDE --dangerously-skip-permissions -p 'バックエンドAPIの実装タスク' > /tmp/agent2.log 2>&1 &
-PID2=$!
-$CLAUDE --dangerously-skip-permissions -p 'テスト作成タスク' > /tmp/agent3.log 2>&1 &
-PID3=$!
-
-# 全エージェント完了を待つ
-wait $PID1 $PID2 $PID3
-
-# 結果確認
-cat /tmp/agent1.log
-cat /tmp/agent2.log
-cat /tmp/agent3.log
-```
-
-### 必須ルール
-1. 機能実装は必ずフロントエンド/バックエンド/テストを並列起動
-2. タスク受け取り → 分解 → 並列起動 → wait → 統合 → commit の順
-3. 単独で実行するのは小さな修正のみ（1ファイル以内）

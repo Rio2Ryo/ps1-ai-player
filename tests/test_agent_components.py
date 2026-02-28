@@ -548,3 +548,83 @@ class TestAIAgentLangHint:
     def test_lang_hint_set(self) -> None:
         agent = AIAgent(game_id="TEST", lang_hint="ja")
         assert agent.lang_hint == "ja"
+
+
+# ------------------------------------------------------------------
+# ActionHistory export / load tests
+# ------------------------------------------------------------------
+
+
+class TestActionHistoryExport:
+    """Tests for ActionHistory.to_dict(), save(), load(), from_session_json()."""
+
+    @staticmethod
+    def _sample_history(n: int = 3) -> ActionHistory:
+        h = ActionHistory(max_size=10)
+        for i in range(n):
+            h.add(ActionRecord(
+                step=i + 1,
+                action=["up", "z"],
+                reasoning=f"reason {i}",
+                observations=f"obs {i}",
+                parameters={"money": 1000 * (i + 1)},
+            ))
+        return h
+
+    def test_action_history_to_dict(self) -> None:
+        h = self._sample_history(2)
+        result = h.to_dict()
+        assert isinstance(result, list)
+        assert len(result) == 2
+        for entry in result:
+            assert set(entry.keys()) == {"step", "action", "reasoning", "observations", "parameters"}
+            assert isinstance(entry["step"], int)
+            assert isinstance(entry["action"], list)
+            assert isinstance(entry["reasoning"], str)
+            assert isinstance(entry["observations"], str)
+            assert isinstance(entry["parameters"], dict)
+        assert result[0]["step"] == 1
+        assert result[1]["parameters"] == {"money": 2000}
+
+    def test_action_history_save_load_roundtrip(self, tmp_path: Path) -> None:
+        h = self._sample_history(3)
+        save_path = tmp_path / "history.json"
+        returned = h.save(save_path)
+        assert returned == save_path
+
+        loaded = ActionHistory.load(save_path)
+        assert len(loaded.records) == 3
+        for orig, restored in zip(h.records, loaded.records):
+            assert orig.step == restored.step
+            assert orig.action == restored.action
+            assert orig.reasoning == restored.reasoning
+            assert orig.observations == restored.observations
+            assert orig.parameters == restored.parameters
+
+    def test_action_history_load_nonexistent(self, tmp_path: Path) -> None:
+        loaded = ActionHistory.load(tmp_path / "does_not_exist.json")
+        assert len(loaded.records) == 0
+
+    def test_action_history_load_truncates(self, tmp_path: Path) -> None:
+        h = self._sample_history(5)
+        save_path = tmp_path / "history.json"
+        h.save(save_path)
+
+        loaded = ActionHistory.load(save_path, max_size=3)
+        assert len(loaded.records) == 3
+        # Should keep the last 3 (steps 3, 4, 5)
+        assert loaded.records[0].step == 3
+        assert loaded.records[-1].step == 5
+
+    def test_action_history_save_creates_file(self, tmp_path: Path) -> None:
+        h = self._sample_history(1)
+        save_path = tmp_path / "sub" / "history.json"
+        save_path.parent.mkdir(parents=True)
+        h.save(save_path)
+        assert save_path.exists()
+        assert save_path.stat().st_size > 0
+
+    def test_from_session_json_raises(self, tmp_path: Path) -> None:
+        import pytest
+        with pytest.raises(NotImplementedError):
+            ActionHistory.from_session_json(tmp_path / "session.json")

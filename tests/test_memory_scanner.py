@@ -13,7 +13,13 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from memory_scanner import DATA_TYPES, PS1_RAM_SIZE, MemoryScanner, ScanResult
+from memory_scanner import (
+    DATA_TYPES,
+    PS1_RAM_SIZE,
+    MemoryScanner,
+    ScanResult,
+    export_scan_results,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -464,3 +470,116 @@ class TestEdgeCases:
 
     def test_ps1_ram_size_constant(self) -> None:
         assert PS1_RAM_SIZE == 0x200000  # 2 MB
+
+
+# ---------------------------------------------------------------------------
+# scan_value — float32 tolerance
+# ---------------------------------------------------------------------------
+
+
+class TestScanValueFloat32:
+    """Tests for float32 approximate matching in scan_value()."""
+
+    FAKE_FD = 42
+    BASE = 0x7F000000
+
+    def _patch_os(self, ram: bytearray):
+        pos = [0]
+
+        def fake_open(path, flags):
+            return self.FAKE_FD
+
+        def fake_lseek(fd, offset, whence):
+            pos[0] = offset - self.BASE
+            return offset
+
+        def fake_read(fd, size):
+            data = bytes(ram[pos[0]: pos[0] + size])
+            pos[0] += size
+            return data
+
+        def fake_close(fd):
+            pass
+
+        return patch.multiple(
+            os,
+            open=fake_open,
+            lseek=fake_lseek,
+            read=fake_read,
+            close=fake_close,
+        )
+
+    def test_scan_value_float32_exact_match(self) -> None:
+        """float32 exact value matches within default tolerance."""
+        ram = _build_fake_ram(0x1000)
+        struct.pack_into("<f", ram, 0x0100, 3.14)
+        scanner = _scanner_with_base(base_offset=self.BASE)
+        with self._patch_os(ram):
+            results = scanner.scan_value(3.14, "float32", start=0, end=0x1000)
+        assert len(results) >= 1
+        assert any(r.address == 0x0100 for r in results)
+
+    def test_scan_value_float32_tolerance(self) -> None:
+        """float32 value with small error within tolerance is matched."""
+        ram = _build_fake_ram(0x1000)
+        # Pack a value slightly different from target
+        target = 100.0
+        slightly_off = 100.005  # relative error = 0.005 / 100 = 5e-5 < 1e-4
+        struct.pack_into("<f", ram, 0x0200, slightly_off)
+        scanner = _scanner_with_base(base_offset=self.BASE)
+        with self._patch_os(ram):
+            results = scanner.scan_value(target, "float32", start=0, end=0x1000)
+        assert any(r.address == 0x0200 for r in results)
+
+    def test_scan_value_float32_out_of_tolerance(self) -> None:
+        """float32 value outside tolerance is not matched."""
+        ram = _build_fake_ram(0x1000)
+        target = 100.0
+        far_off = 101.0  # relative error = 1.0 / 101.0 ~ 0.0099 >> 1e-4
+        struct.pack_into("<f", ram, 0x0200, far_off)
+        scanner = _scanner_with_base(base_offset=self.BASE)
+        with self._patch_os(ram):
+            results = scanner.scan_value(target, "float32", start=0, end=0x1000)
+        assert not any(r.address == 0x0200 for r in results)
+
+    def test_scan_value_int_ignores_tolerance(self) -> None:
+        """int32 scan uses exact byte match and ignores tolerance parameter."""
+        ram = _build_fake_ram(0x1000)
+        struct.pack_into("<i", ram, 0x0100, 42)
+        struct.pack_into("<i", ram, 0x0200, 43)  # off by 1
+        scanner = _scanner_with_base(base_offset=self.BASE)
+        with self._patch_os(ram):
+            results = scanner.scan_value(42, "int32", start=0, end=0x1000, tolerance=0.5)
+        # Only exact match at 0x0100, not 0x0200 despite large tolerance
+        assert len(results) == 1
+        assert results[0].address == 0x0100
+
+
+# ---------------------------------------------------------------------------
+# export_scan_results
+# ---------------------------------------------------------------------------
+
+
+class TestExportScanResults:
+    """Tests for export_scan_results() CSV export."""
+
+    def test_export_scan_results_csv(self, tmp_path: Path) -> None:
+        """CSV contains header and correct rows."""
+        results = [
+            ScanResult(address=0x001000, value=42, data_type="int32"),
+            ScanResult(address=0x002000, value=3.14, data_type="float32"),
+        ]
+        out = export_scan_results(results, tmp_path / "out.csv")
+        assert out == tmp_path / "out.csv"
+        lines = out.read_text().splitlines()
+        assert lines[0] == "address,value,data_type"
+        assert lines[1] == "0x001000,42,int32"
+        assert lines[2] == "0x002000,3.14,float32"
+        assert len(lines) == 3
+
+    def test_export_scan_results_empty(self, tmp_path: Path) -> None:
+        """Empty results list produces header-only CSV."""
+        out = export_scan_results([], tmp_path / "empty.csv")
+        lines = out.read_text().splitlines()
+        assert len(lines) == 1
+        assert lines[0] == "address,value,data_type"

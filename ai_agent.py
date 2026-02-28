@@ -12,6 +12,7 @@ import argparse
 import base64
 import csv
 import io
+import json
 import logging
 import os
 import signal
@@ -100,6 +101,59 @@ class ActionHistory:
                 f"{param_str}"
             )
         return "\n".join(lines)
+
+    def to_dict(self) -> list[dict[str, Any]]:
+        """Convert all records to a JSON-serializable list of dicts."""
+        return [
+            {
+                "step": rec.step,
+                "action": list(rec.action),
+                "reasoning": rec.reasoning,
+                "observations": rec.observations,
+                "parameters": dict(rec.parameters),
+            }
+            for rec in self._records
+        ]
+
+    def save(self, path: Path) -> Path:
+        """Save history to a JSON file. Returns the path written."""
+        path = Path(path)
+        path.write_text(json.dumps(self.to_dict(), indent=2, ensure_ascii=False))
+        return path
+
+    @classmethod
+    def load(cls, path: Path, max_size: int = ACTION_HISTORY_SIZE) -> ActionHistory:
+        """Load history from a JSON file saved by :meth:`save`.
+
+        Returns an empty ActionHistory if *path* does not exist.
+        Only the last *max_size* records are kept.
+        """
+        hist = cls(max_size=max_size)
+        path = Path(path)
+        if not path.exists():
+            return hist
+        data = json.loads(path.read_text())
+        # Keep only the tail
+        for entry in data[-max_size:]:
+            hist.add(ActionRecord(
+                step=entry.get("step", 0),
+                action=entry.get("action", []),
+                reasoning=entry.get("reasoning", ""),
+                observations=entry.get("observations", ""),
+                parameters=entry.get("parameters", {}),
+            ))
+        return hist
+
+    @classmethod
+    def from_session_json(cls, session_json_path: Path, max_size: int = ACTION_HISTORY_SIZE) -> ActionHistory:
+        """Not supported — .session.json has a different structure.
+
+        Use :meth:`load` with a file produced by :meth:`save` instead.
+        """
+        raise NotImplementedError(
+            "from_session_json is not supported. "
+            "Use ActionHistory.load() with a file saved by ActionHistory.save()."
+        )
 
     @property
     def records(self) -> list[ActionRecord]:
@@ -1106,6 +1160,7 @@ class AIAgent:
     interval: float = 5.0
     api_key: str | None = None
     lang_hint: str = ""
+    resume_history_path: Path | None = None
 
     _running: bool = field(default=False, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -1168,7 +1223,11 @@ class AIAgent:
         keyboard = KeyboardController()
         memory = MemoryReader(self.game_id)
         game_logger = GameLogger(self.game_id)
-        history = ActionHistory()
+        if self.resume_history_path:
+            history = ActionHistory.load(self.resume_history_path)
+            logger.info("Resumed %d history records from %s", len(history.records), self.resume_history_path)
+        else:
+            history = ActionHistory()
         cost_tracker = CostTracker()
         state_tracker = GameStateTracker()
         trend_analyzer = ParameterTrendAnalyzer()
@@ -1325,7 +1384,6 @@ class AIAgent:
             )
 
             # Write session summary JSON next to the log
-            import json as _json
             session_data = {
                 "cost": cost_summary,
                 "game_state": state_summary,
@@ -1333,8 +1391,12 @@ class AIAgent:
                 "total_steps": self._step,
             }
             cost_path = game_logger.log_path.with_suffix(".session.json")
-            cost_path.write_text(_json.dumps(session_data, indent=2))
+            cost_path.write_text(json.dumps(session_data, indent=2))
             logger.info("Session summary: %s", cost_path)
+
+            # Save action history for session resumption
+            history_path = history.save(game_logger.log_path.with_suffix(".history.json"))
+            logger.info("Action history: %s", history_path)
 
 
 # ---------------------------------------------------------------------------
@@ -1380,6 +1442,12 @@ def main() -> None:
         default="",
         help="Language hint for the game (e.g. ja, en). Helps GPT-4o interpret on-screen text.",
     )
+    parser.add_argument(
+        "--resume-history",
+        default=None,
+        type=Path,
+        help="Path to a .history.json from a previous session to resume learning from.",
+    )
     args = parser.parse_args()
 
     agent = AIAgent(
@@ -1389,6 +1457,7 @@ def main() -> None:
         interval=args.interval,
         api_key=args.openai_key,
         lang_hint=args.lang,
+        resume_history_path=args.resume_history,
     )
     agent.run()
 

@@ -7,6 +7,7 @@ PS1 RAM is 2MB: 0x00000000-0x001FFFFF.
 
 from __future__ import annotations
 
+import csv
 import os
 import re
 import struct
@@ -241,6 +242,7 @@ class MemoryScanner:
         start: int = 0,
         end: int = PS1_RAM_SIZE,
         alignment: int | None = None,
+        tolerance: float = 1e-4,
     ) -> list[ScanResult]:
         """Scan the entire PS1 RAM for addresses containing the given value.
 
@@ -250,6 +252,7 @@ class MemoryScanner:
             start: Start address in PS1 RAM.
             end: End address in PS1 RAM.
             alignment: Address alignment (defaults to data size).
+            tolerance: Relative error tolerance for float32 matching (ignored for int types).
 
         Returns:
             List of ScanResult with matching addresses.
@@ -262,12 +265,21 @@ class MemoryScanner:
         raw_data = self._read_bytes(start, end - start)
 
         results: list[ScanResult] = []
+        use_float_match = data_type == "float32"
         target_bytes = struct.pack(fmt, value)
 
         for offset in range(0, len(raw_data) - size + 1, alignment):
-            if raw_data[offset : offset + size] == target_bytes:
-                addr = start + offset
-                results.append(ScanResult(address=addr, value=value, data_type=data_type))
+            chunk = raw_data[offset : offset + size]
+            if use_float_match:
+                actual = struct.unpack(fmt, chunk)[0]
+                denom = max(abs(value), abs(actual), 1e-30)
+                if abs(actual - value) / denom <= tolerance:
+                    addr = start + offset
+                    results.append(ScanResult(address=addr, value=actual, data_type=data_type))
+            else:
+                if chunk == target_bytes:
+                    addr = start + offset
+                    results.append(ScanResult(address=addr, value=value, data_type=data_type))
 
         print(f"Scan complete: {len(results)} addresses found with value {value}")
         return results
@@ -330,6 +342,26 @@ class MemoryScanner:
         self._close_mem()
 
 
+def export_scan_results(results: list[ScanResult], path: Path) -> Path:
+    """Export scan results to a CSV file.
+
+    Args:
+        results: List of ScanResult to export.
+        path: Output file path.
+
+    Returns:
+        The path the CSV was written to.
+    """
+    path = Path(path)
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["address", "value", "data_type"])
+        for r in results:
+            writer.writerow([f"0x{r.address:06X}", r.value, r.data_type])
+    _log.info("Exported %d scan results to %s", len(results), path)
+    return path
+
+
 def interactive_session() -> None:
     """Run an interactive memory scanning session."""
     print("=== PS1 Memory Scanner - Interactive Session ===")
@@ -340,6 +372,7 @@ def interactive_session() -> None:
     print("  read <hex_addr> [type] - Read a specific address")
     print("  write <hex_addr> <val> [type] - Write value to address")
     print("  results                - Show current result set")
+    print("  export [path]          - Export results to CSV (default: ./scan_results.csv)")
     print("  pid <pid>              - Set DuckStation PID manually")
     print("  quit                   - Exit")
     print()
@@ -442,6 +475,14 @@ def interactive_session() -> None:
                         print(f"  0x{r.address:06X} = {r.value}")
                     if len(current_results) > 50:
                         print(f"  ... and {len(current_results) - 50} more")
+
+            elif command == "export":
+                if not current_results:
+                    print("No results to export.")
+                    continue
+                export_path = Path(parts[1]) if len(parts) > 1 else Path("./scan_results.csv")
+                out = export_scan_results(current_results, export_path)
+                print(f"Exported {len(current_results)} results to {out}")
 
             else:
                 print(f"Unknown command: {command}")
