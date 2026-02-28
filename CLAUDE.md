@@ -147,7 +147,7 @@ python lua_generator.py --game SLPM-86023
 
 ## Key Technical Patterns
 
-- **Logging**: `from log_config import get_logger` — structured logging in all modules
+- **Logging**: `from log_config import get_logger` — structured logging in all modules (including `memory_scanner.write_address`)
 - **PS1 RAM**: 2MB at 0x00000000-0x001FFFFF, accessed via `/proc/PID/mem`
 - **Memory detection**: 4-pass strategy in `_find_ps1_ram_offset()` parsing `/proc/PID/maps`
 - **API retry**: Exponential backoff (2s base, 3 retries) in `GPT4VAnalyzer.analyze_screen()`
@@ -171,6 +171,8 @@ python lua_generator.py --game SLPM-86023
 - **Parameter role inference**: `_infer_parameter_role()` uses keyword heuristics + statistical classification instead of hardcoded roles
 - **Parameter classification**: `_classify_parameter()` uses 4-quartile monotonicity check to avoid U/V-shape misclassification
 - **Session summary**: Agent saves .session.json with cost, game_state transitions, and strategy switch history
+- **GameLogger column ordering**: CSV columns sorted alphabetically for consistent output across sessions
+- **Configurable monitor**: `ScreenCapture(default_monitor=N)` and `AIAgent --monitor N` CLI flag
 
 ## Environment
 

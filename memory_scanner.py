@@ -233,7 +233,7 @@ class MemoryScanner:
         fmt, _size = DATA_TYPES[data_type]
         data = struct.pack(fmt, value)
         self._write_bytes(address, data)
-        print(f"Wrote {value} to 0x{address:06X} ({data_type})")
+        _log.info("Wrote %s to 0x%06X (%s)", value, address, data_type)
 
     def scan_value(
         self,

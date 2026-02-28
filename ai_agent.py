@@ -681,7 +681,8 @@ class AdaptiveStrategyEngine:
 class ScreenCapture:
     """Capture the DuckStation window using mss (X11/Wayland compatible)."""
 
-    def __init__(self) -> None:
+    def __init__(self, default_monitor: int = 1) -> None:
+        self._default_monitor = default_monitor
         self._is_wayland = "WAYLAND_DISPLAY" in os.environ
 
         # Validate display environment before initializing mss
@@ -702,27 +703,28 @@ class ScreenCapture:
                 f"WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY', '(not set)')}"
             ) from e
 
-    def capture(self, monitor_index: int = 1) -> Image.Image:
+    def capture(self, monitor_index: int | None = None) -> Image.Image:
         """Capture the screen (or specific monitor) as a PIL Image.
 
         Args:
-            monitor_index: Monitor index (1 = primary).
+            monitor_index: Monitor index (default: configured default_monitor).
 
         Returns:
             PIL Image of the captured screen.
         """
-        monitor = self._sct.monitors[monitor_index]
+        idx = monitor_index if monitor_index is not None else self._default_monitor
+        monitor = self._sct.monitors[idx]
         screenshot = self._sct.grab(monitor)
         img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
         return img
 
     def capture_to_base64(
-        self, monitor_index: int = 1, max_size: tuple[int, int] = (1024, 768)
+        self, monitor_index: int | None = None, max_size: tuple[int, int] = (1024, 768)
     ) -> str:
         """Capture screen and return as base64-encoded JPEG.
 
         Args:
-            monitor_index: Monitor index.
+            monitor_index: Monitor index (default: configured default_monitor).
             max_size: Max dimensions to resize to (for API cost savings).
 
         Returns:
@@ -735,7 +737,7 @@ class ScreenCapture:
         img.save(buffer, format="JPEG", quality=80)
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def save_screenshot(self, path: Path, monitor_index: int = 1) -> Path:
+    def save_screenshot(self, path: Path, monitor_index: int | None = None) -> Path:
         """Capture and save screenshot to file."""
         img = self.capture(monitor_index)
         img.save(str(path))
@@ -1130,6 +1132,7 @@ class GameLogger:
         self._file = open(self.log_path, "w", newline="")
         self._writer = csv.writer(self._file)
         self._header_written = False
+        self._param_names: list[str] = []
 
     def log(
         self,
@@ -1141,13 +1144,14 @@ class GameLogger:
     ) -> None:
         """Log one agent step."""
         if not self._header_written:
+            self._param_names = sorted(parameters.keys())
             header = [
                 "timestamp",
                 "step",
                 "action",
                 "reasoning",
                 "observations",
-            ] + list(parameters.keys())
+            ] + self._param_names
             self._writer.writerow(header)
             self._header_written = True
 
@@ -1157,7 +1161,7 @@ class GameLogger:
             ";".join(action),
             reasoning,
             observations,
-        ] + [parameters.get(k, -1) for k in parameters]
+        ] + [parameters.get(k, -1) for k in self._param_names]
         self._writer.writerow(row)
         self._file.flush()
 
@@ -1190,6 +1194,7 @@ class AIAgent:
     lang_hint: str = ""
     resume_history_path: Path | None = None
     strategy_config: str | None = None
+    monitor_index: int = 1
 
     _running: bool = field(default=False, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -1247,7 +1252,7 @@ class AIAgent:
 
         self._wait_for_duckstation()
 
-        screen = ScreenCapture()
+        screen = ScreenCapture(default_monitor=getattr(self, 'monitor_index', 1))
         analyzer = GPT4VAnalyzer(api_key=self.api_key)
         keyboard = KeyboardController()
         memory = MemoryReader(self.game_id)
@@ -1489,6 +1494,12 @@ def main() -> None:
         help="Language hint for the game (e.g. ja, en). Helps GPT-4o interpret on-screen text.",
     )
     parser.add_argument(
+        "--monitor",
+        type=int,
+        default=1,
+        help="Monitor index for screen capture (default: 1)",
+    )
+    parser.add_argument(
         "--resume-history",
         default=None,
         type=Path,
@@ -1505,6 +1516,7 @@ def main() -> None:
         lang_hint=args.lang,
         resume_history_path=args.resume_history,
         strategy_config=args.strategy_config,
+        monitor_index=args.monitor,
     )
     agent.run()
 
