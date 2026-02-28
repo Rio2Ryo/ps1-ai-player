@@ -80,7 +80,7 @@ pipeline.py (post-session analysis)
 | `ai_agent.py` | Main agent: screenshot → GPT-4o → keyboard input loop |
 | `data_analyzer.py` | Pearson + bidirectional lag cross-correlation → causal chains |
 | `gdd_generator.py` | Causal chains or CSV → GDD (local + GPT-4), JSON export |
-| `game_prototype.py` | Theme park simulator with from_gdd() + CSV export |
+| `game_prototype.py` | Multi-genre game simulator (ThemePark/RPG/Action) with from_gdd() + CSV export |
 | `pipeline.py` | End-to-end: logs → analysis → GDD → prototype |
 | `visualizer.py` | Matplotlib charts: heatmap, time-series, lag bars, causal graph |
 | `log_config.py` | Shared Python logging configuration |
@@ -132,8 +132,12 @@ python gdd_generator.py --csv sample_data/sample_log.csv --game DEMO --local --f
 # GDD from pre-computed chains (existing workflow)
 python gdd_generator.py --chains reports/demo_causal_chains.json --game DEMO --local
 
-# Run simulation with CSV export
+# Run simulation with CSV export (default: themepark)
 python game_prototype.py --frames 3600 --verbose --csv-output reports/sim_output.csv
+
+# Run RPG or Action simulation
+python game_prototype.py --genre rpg --frames 3600 --verbose
+python game_prototype.py --genre action --frames 3600 --verbose
 
 # Memory scanning (requires DuckStation running)
 sudo python memory_scanner.py
@@ -173,6 +177,8 @@ python lua_generator.py --game SLPM-86023
 - **Session summary**: Agent saves .session.json with cost, game_state transitions, and strategy switch history
 - **GameLogger column ordering**: CSV columns sorted alphabetically for consistent output across sessions
 - **Configurable monitor**: `ScreenCapture(default_monitor=N)` and `AIAgent --monitor N` CLI flag
+- **Generic simulation hierarchy**: `GenericAgent`/`GenericElement`/`GenericGameSimulator` base classes with `ThemePark`/`RPG`/`Action` subclasses. Backwards compat aliases: `ParkSimulator = ThemeParkSimulator`, `VisitorAgent = ThemeParkAgent`, `RideAttraction = ThemeParkAttraction`
+- **GDD DRY sections**: `_generate_analysis_sections()` private method called by both `generate_local_gdd()` and `generate_full_gdd()` to avoid section duplication
 
 ## Environment
 

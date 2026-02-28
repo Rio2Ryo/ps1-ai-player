@@ -644,6 +644,28 @@ class GDDGenerator:
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
+    # Shared analysis sections
+    # ------------------------------------------------------------------
+
+    def _generate_analysis_sections(self) -> str:
+        """Generate all data-driven analysis sections.
+
+        Returns:
+            Concatenated Markdown string of all analysis sections.
+        """
+        return (
+            self.generate_statistics_section() + "\n"
+            + self.generate_correlation_matrix_section() + "\n"
+            + self.generate_data_quality_section() + "\n"
+            + self.generate_event_analysis_section() + "\n"
+            + self.generate_mechanics_section() + "\n"
+            + self.generate_balance_section() + "\n"
+            + self.generate_feedback_loops_section() + "\n"
+            + self.generate_state_analysis_section() + "\n"
+            + self.generate_strategy_section() + "\n"
+        )
+
+    # ------------------------------------------------------------------
     # Local GDD generation (moved from pipeline.py)
     # ------------------------------------------------------------------
 
@@ -687,16 +709,8 @@ class GDDGenerator:
             param_section += f"| {p} | {role} |\n"
         param_section += "\n"
 
-        # Sections
-        mechanics = self.generate_mechanics_section()
-        balance = self.generate_balance_section()
-        feedback_loops = self.generate_feedback_loops_section()
-        statistics = self.generate_statistics_section()
-        correlations = self.generate_correlation_matrix_section()
-        data_quality = self.generate_data_quality_section()
-        event_analysis = self.generate_event_analysis_section()
-        state_analysis = self.generate_state_analysis_section()
-        strategy_config = self.generate_strategy_section()
+        # Data-driven sections
+        analysis = self._generate_analysis_sections()
 
         # Implementation priority
         priority = "## Implementation Priority\n\n"
@@ -718,15 +732,7 @@ class GDDGenerator:
 
         return (
             header + overview + param_section
-            + statistics + "\n"
-            + correlations + "\n"
-            + data_quality + "\n"
-            + event_analysis + "\n"
-            + mechanics + "\n"
-            + balance + "\n"
-            + feedback_loops + "\n"
-            + state_analysis + "\n"
-            + strategy_config + "\n"
+            + analysis
             + priority
         )
 
@@ -878,17 +884,7 @@ class GDDGenerator:
             "---\n\n"
         )
 
-        local_sections = (
-            self.generate_mechanics_section() + "\n"
-            + self.generate_balance_section() + "\n"
-            + self.generate_feedback_loops_section() + "\n"
-            + self.generate_statistics_section() + "\n"
-            + self.generate_correlation_matrix_section() + "\n"
-            + self.generate_data_quality_section() + "\n"
-            + self.generate_event_analysis_section() + "\n"
-            + self.generate_state_analysis_section() + "\n"
-            + self.generate_strategy_section() + "\n"
-        )
+        local_sections = self._generate_analysis_sections()
 
         gdd = (
             header
