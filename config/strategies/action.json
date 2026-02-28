@@ -1,0 +1,10 @@
+{
+  "genre": "action",
+  "description": "Action/platformer games (e.g., Crash Bandicoot, Mega Man)",
+  "thresholds": [
+    {"parameter": "lives", "operator": "lt", "value": 2, "target_strategy": "cautious", "priority": 10},
+    {"parameter": "hp", "operator": "lt", "value": 25, "target_strategy": "defensive", "priority": 9},
+    {"parameter": "score", "operator": "gt", "value": 50000, "target_strategy": "aggressive", "priority": 5},
+    {"parameter": "time", "operator": "lt", "value": 30, "target_strategy": "rush", "priority": 8}
+  ]
+}

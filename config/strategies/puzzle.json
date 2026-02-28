@@ -1,0 +1,10 @@
+{
+  "genre": "puzzle",
+  "description": "Puzzle games (e.g., Puyo Puyo, Tetris)",
+  "thresholds": [
+    {"parameter": "stack_height", "operator": "gt", "value": 80, "target_strategy": "emergency_clear", "priority": 10},
+    {"parameter": "combo", "operator": "gt", "value": 5, "target_strategy": "chain_extend", "priority": 8},
+    {"parameter": "speed", "operator": "gt", "value": 8, "target_strategy": "defensive", "priority": 9},
+    {"parameter": "score", "operator": "gt", "value": 100000, "target_strategy": "aggressive", "priority": 5}
+  ]
+}

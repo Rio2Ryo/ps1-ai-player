@@ -90,7 +90,8 @@ pipeline.py (post-session analysis)
 | `demo_run.py` | E2E demo: sample data → analysis → GDD → charts → simulation (no API key needed) |
 | `sample_data/DEMO.json` | Demo memory address definitions (GameAddresses format) |
 | `sample_data/expected_output/` | Pre-generated pipeline outputs (GDD, causal chains) |
-| `tests/` | pytest suite (286 tests) |
+| `config/strategies/` | Genre-specific strategy configs (rpg, action, sports, puzzle, themepark) |
+| `tests/` | pytest suite (298 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `pyproject.toml` | Project metadata + pytest configuration |
 
@@ -156,7 +157,7 @@ python lua_generator.py --game SLPM-86023
 - **Auto-pipeline**: run.sh automatically runs analysis + visualization after agent session
 - **Game state tracking**: `GameStateTracker` classifies screens (menu/gameplay/dialog/loading/pause) via keyword matching on GPT-4o observations + parameter change detection
 - **Parameter trends**: `ParameterTrendAnalyzer` with sliding window (20 steps) detects rising/falling/stable/volatile trends and significant jumps
-- **Adaptive strategy**: `AdaptiveStrategyEngine` switches strategy based on parameter thresholds (e.g., money<1000 → cost_reduction). Priority-ordered evaluation, JSON-configurable per game
+- **Adaptive strategy**: `AdaptiveStrategyEngine` switches strategy based on parameter thresholds. Multi-genre support via `config/strategies/` presets (rpg/action/sports/puzzle/themepark). `--strategy-config` CLI flag or `from_genre()` / `from_json()` classmethods. Priority-ordered evaluation
 - **Multi-language support**: `GPT4VAnalyzer` system prompt includes Japanese text recognition instructions (kanji/hiragana/katakana). `analyze_screen()` accepts `game_state` and `lang_hint` params. `AIAgent --lang ja/en` CLI flag
 - **GDD language selection**: `generate_full_gdd(lang="ja"|"en")` and `_build_llm_prompt()` static method for language-specific LLM prompts. CLI `--lang` in both `gdd_generator.py` and `pipeline.py`
 - **Loading state skip**: Agent skips keyboard input during GAME_STATE_LOADING to avoid wasted actions
@@ -165,6 +166,7 @@ python lua_generator.py --game SLPM-86023
 - **GDD sections**: Descriptive statistics, full correlation matrix, data quality report, event/action frequency analysis
 - **GDD JSON export**: `save_gdd(fmt="json"|"both")` for structured output; `to_dict()` for programmatic access
 - **Parameter role inference**: `_infer_parameter_role()` uses keyword heuristics + statistical classification instead of hardcoded roles
+- **Parameter classification**: `_classify_parameter()` uses 4-quartile monotonicity check to avoid U/V-shape misclassification
 - **Session summary**: Agent saves .session.json with cost, game_state transitions, and strategy switch history
 
 ## Environment

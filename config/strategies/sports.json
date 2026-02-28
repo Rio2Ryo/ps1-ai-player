@@ -1,0 +1,10 @@
+{
+  "genre": "sports",
+  "description": "Sports/racing games (e.g., Gran Turismo, Winning Eleven)",
+  "thresholds": [
+    {"parameter": "score_diff", "operator": "lt", "value": -2, "target_strategy": "aggressive", "priority": 10},
+    {"parameter": "stamina", "operator": "lt", "value": 20, "target_strategy": "conservation", "priority": 9},
+    {"parameter": "time_remaining", "operator": "lt", "value": 60, "target_strategy": "rush", "priority": 8},
+    {"parameter": "score_diff", "operator": "gt", "value": 3, "target_strategy": "defensive", "priority": 7}
+  ]
+}

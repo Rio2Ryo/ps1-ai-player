@@ -451,21 +451,31 @@ class GDDGenerator:
         cv = std / abs(mean) if mean != 0 else 0
 
         # Heuristic: check if the raw data shows a monotonic trend
-        is_monotonic = False
         if self.raw_df is not None and param in self.raw_df.columns:
             series = self.raw_df[param].dropna()
             if len(series) >= 10:
-                # Check first vs last quartile means
-                q1_mean = series.iloc[: len(series) // 4].mean()
-                q4_mean = series.iloc[-len(series) // 4 :].mean()
-                total_range = mx - mn if mx != mn else 1
-                drift = (q4_mean - q1_mean) / total_range
-                if drift > 0.5:
-                    is_monotonic = True
-                    return "Accumulating resource (monotonically rising)"
-                if drift < -0.5:
-                    is_monotonic = True
-                    return "Depleting resource (monotonically falling)"
+                # Split into 4 quartiles and check monotonicity
+                n = len(series)
+                q_size = n // 4
+                if q_size > 0:
+                    q_means = [
+                        series.iloc[i * q_size : (i + 1) * q_size].mean()
+                        for i in range(4)
+                    ]
+                    # Include remaining elements in the last quartile
+                    if n % 4 != 0:
+                        q_means[3] = series.iloc[3 * q_size :].mean()
+
+                    total_range = mx - mn if mx != mn else 1
+                    diffs = [q_means[i + 1] - q_means[i] for i in range(3)]
+
+                    # Monotonically rising: all diffs positive AND overall drift > 0.5
+                    overall_drift = (q_means[3] - q_means[0]) / total_range
+                    if all(d > 0 for d in diffs) and overall_drift > 0.5:
+                        return "Accumulating resource (monotonically rising)"
+                    # Monotonically falling: all diffs negative AND overall drift < -0.5
+                    if all(d < 0 for d in diffs) and overall_drift < -0.5:
+                        return "Depleting resource (monotonically falling)"
 
         if cv > 0.5:
             return "Volatile parameter (high std/mean ratio)"

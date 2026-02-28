@@ -1,0 +1,12 @@
+{
+  "genre": "themepark",
+  "description": "Theme park management games (e.g., Theme Park, RollerCoaster Tycoon)",
+  "thresholds": [
+    {"parameter": "money", "operator": "lt", "value": 1000, "target_strategy": "cost_reduction", "priority": 10},
+    {"parameter": "satisfaction", "operator": "lt", "value": 30, "target_strategy": "satisfaction", "priority": 9},
+    {"parameter": "visitors", "operator": "lt", "value": 15, "target_strategy": "expansion", "priority": 7},
+    {"parameter": "nausea", "operator": "gt", "value": 70, "target_strategy": "satisfaction", "priority": 8},
+    {"parameter": "hunger", "operator": "gt", "value": 80, "target_strategy": "satisfaction", "priority": 6},
+    {"parameter": "money", "operator": "gt", "value": 8000, "target_strategy": "expansion", "priority": 5}
+  ]
+}

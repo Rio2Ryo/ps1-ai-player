@@ -1,0 +1,11 @@
+{
+  "genre": "rpg",
+  "description": "Role-playing games (e.g., Final Fantasy, Dragon Quest)",
+  "thresholds": [
+    {"parameter": "hp", "operator": "lt", "value": 30, "target_strategy": "defensive", "priority": 10},
+    {"parameter": "mp", "operator": "lt", "value": 10, "target_strategy": "conservation", "priority": 9},
+    {"parameter": "hp", "operator": "gt", "value": 80, "target_strategy": "aggressive", "priority": 5},
+    {"parameter": "level", "operator": "lt", "value": 5, "target_strategy": "exploration", "priority": 7},
+    {"parameter": "gold", "operator": "gt", "value": 5000, "target_strategy": "equipment_upgrade", "priority": 6}
+  ]
+}

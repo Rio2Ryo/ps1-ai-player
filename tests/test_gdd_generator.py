@@ -462,3 +462,83 @@ def test_find_cycles_static() -> None:
     assert len(cycles) == 2
     cycle_lengths = sorted(len(c) for c in cycles)
     assert cycle_lengths == [2, 3]
+
+
+# ------------------------------------------------------------------
+# _classify_parameter U/V-shape handling tests
+# ------------------------------------------------------------------
+
+
+class TestClassifyParameter:
+    """Tests for _classify_parameter U/V-shape handling."""
+
+    def _make_generator(self, values: list[float]) -> GDDGenerator:
+        """Helper: create a GDDGenerator with a raw DataFrame."""
+        import pandas as pd
+
+        df = pd.DataFrame({"param": values})
+        gen = GDDGenerator.__new__(GDDGenerator)
+        gen.raw_df = df
+        gen.causal_chains = {}
+        gen.lag_correlations = {}
+        gen.correlation_matrix = {}
+        gen.descriptive_statistics = {}
+        gen.metadata = {}
+        return gen
+
+    def test_monotonic_rising(self) -> None:
+        # Truly monotonic: 0,1,2,...,99
+        gen = self._make_generator(list(range(100)))
+        result = gen._classify_parameter("param", 49.5, 29.0, 0, 99)
+        assert "rising" in result.lower()
+
+    def test_monotonic_falling(self) -> None:
+        # Truly monotonic: 99,98,...,0
+        gen = self._make_generator(list(range(99, -1, -1)))
+        result = gen._classify_parameter("param", 49.5, 29.0, 0, 99)
+        assert "falling" in result.lower()
+
+    def test_u_shape_not_monotonic(self) -> None:
+        # U-shape: high -> low -> high (100->0->100)
+        n = 100
+        half = n // 2
+        falling = [100 - (100 * i / half) for i in range(half)]  # 100 -> 0
+        rising = [(100 * i / half) for i in range(half)]  # 0 -> 100
+        values = falling + rising
+        mn, mx = min(values), max(values)
+        mean = sum(values) / len(values)
+        std = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+        gen = self._make_generator(values)
+        result = gen._classify_parameter("param", mean, std, mn, mx)
+        assert "monotonic" not in result.lower()
+
+    def test_inverted_u_not_monotonic(self) -> None:
+        # Inverted U: 0->100->0
+        n = 100
+        half = n // 2
+        rising = [(100 * i / half) for i in range(half)]  # 0 -> 100
+        falling = [100 - (100 * i / half) for i in range(half)]  # 100 -> 0
+        values = rising + falling
+        mn, mx = min(values), max(values)
+        mean = sum(values) / len(values)
+        std = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+        gen = self._make_generator(values)
+        result = gen._classify_parameter("param", mean, std, mn, mx)
+        assert "monotonic" not in result.lower()
+
+    def test_j_shape_not_monotonic(self) -> None:
+        # J-shape: 50->10->10->90 (not truly monotonic even though end > start)
+        n = 100
+        q = n // 4
+        values = (
+            [50 - 40 * i / q for i in range(q)]  # 50->10
+            + [10.0] * q  # flat at 10
+            + [10.0] * q  # flat at 10
+            + [10 + 80 * i / q for i in range(q)]  # 10->90
+        )
+        mn, mx = min(values), max(values)
+        mean = sum(values) / len(values)
+        std = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+        gen = self._make_generator(values)
+        result = gen._classify_parameter("param", mean, std, mn, mx)
+        assert "monotonic" not in result.lower()

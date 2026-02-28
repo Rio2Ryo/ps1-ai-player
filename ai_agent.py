@@ -527,6 +527,14 @@ class AdaptiveStrategyEngine:
     game state. Falls back to the configured default when no threshold fires.
     """
 
+    GENRE_PRESETS: dict[str, str] = {
+        "themepark": "config/strategies/themepark.json",
+        "rpg": "config/strategies/rpg.json",
+        "action": "config/strategies/action.json",
+        "sports": "config/strategies/sports.json",
+        "puzzle": "config/strategies/puzzle.json",
+    }
+
     # Default thresholds for theme park management games
     DEFAULT_THRESHOLDS: list[dict[str, Any]] = [
         {"parameter": "money", "operator": "lt", "value": 1000, "target_strategy": "cost_reduction", "priority": 10},
@@ -644,6 +652,26 @@ class AdaptiveStrategyEngine:
             default_strategy=default_strategy,
             thresholds=data.get("thresholds", cls.DEFAULT_THRESHOLDS),
         )
+
+    @classmethod
+    def from_genre(cls, genre: str, default_strategy: str = "balanced") -> AdaptiveStrategyEngine:
+        """Load thresholds from a built-in genre preset.
+
+        Args:
+            genre: Genre name (themepark, rpg, action, sports, puzzle).
+            default_strategy: Fallback strategy.
+
+        Returns:
+            Configured AdaptiveStrategyEngine.
+
+        Raises:
+            ValueError: If genre is not recognized.
+        """
+        if genre not in cls.GENRE_PRESETS:
+            available = ", ".join(sorted(cls.GENRE_PRESETS))
+            raise ValueError(f"Unknown genre '{genre}'. Available: {available}")
+        config_path = Path(__file__).parent / cls.GENRE_PRESETS[genre]
+        return cls.from_json(config_path, default_strategy=default_strategy)
 
 
 # ---------------------------------------------------------------------------
@@ -1161,6 +1189,7 @@ class AIAgent:
     api_key: str | None = None
     lang_hint: str = ""
     resume_history_path: Path | None = None
+    strategy_config: str | None = None
 
     _running: bool = field(default=False, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -1231,7 +1260,19 @@ class AIAgent:
         cost_tracker = CostTracker()
         state_tracker = GameStateTracker()
         trend_analyzer = ParameterTrendAnalyzer()
-        strategy_engine = AdaptiveStrategyEngine(default_strategy=self.strategy)
+        if self.strategy_config:
+            config_path = Path(self.strategy_config)
+            if config_path.is_file():
+                strategy_engine = AdaptiveStrategyEngine.from_json(config_path, default_strategy=self.strategy)
+                logger.info("Loaded strategy config from %s", config_path)
+            elif self.strategy_config in AdaptiveStrategyEngine.GENRE_PRESETS:
+                strategy_engine = AdaptiveStrategyEngine.from_genre(self.strategy_config, default_strategy=self.strategy)
+                logger.info("Loaded genre preset: %s", self.strategy_config)
+            else:
+                logger.warning("Strategy config '%s' not found. Using defaults.", self.strategy_config)
+                strategy_engine = AdaptiveStrategyEngine(default_strategy=self.strategy)
+        else:
+            strategy_engine = AdaptiveStrategyEngine(default_strategy=self.strategy)
 
         self._running = True
         consecutive_errors = 0
@@ -1419,6 +1460,11 @@ def main() -> None:
         help="Strategy mode (default: balanced)",
     )
     parser.add_argument(
+        "--strategy-config",
+        default=None,
+        help="Path to strategy config JSON file, or built-in genre name (rpg, action, sports, puzzle, themepark)",
+    )
+    parser.add_argument(
         "--detail",
         "-d",
         default="low",
@@ -1458,6 +1504,7 @@ def main() -> None:
         api_key=args.openai_key,
         lang_hint=args.lang,
         resume_history_path=args.resume_history,
+        strategy_config=args.strategy_config,
     )
     agent.run()
 

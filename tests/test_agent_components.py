@@ -310,6 +310,49 @@ class TestAdaptiveStrategyEngine:
         # money has higher priority, so cost_reduction wins
         assert result == "cost_reduction"
 
+    def test_from_genre_rpg(self) -> None:
+        engine = AdaptiveStrategyEngine.from_genre("rpg")
+        result = engine.evaluate({"hp": 10, "mp": 50}, step=1)
+        assert result == "defensive"
+
+    def test_from_genre_action(self) -> None:
+        engine = AdaptiveStrategyEngine.from_genre("action")
+        result = engine.evaluate({"lives": 1, "hp": 50}, step=1)
+        assert result == "cautious"
+
+    def test_from_genre_sports(self) -> None:
+        engine = AdaptiveStrategyEngine.from_genre("sports")
+        result = engine.evaluate({"score_diff": -5, "stamina": 50}, step=1)
+        assert result == "aggressive"
+
+    def test_from_genre_puzzle(self) -> None:
+        engine = AdaptiveStrategyEngine.from_genre("puzzle")
+        result = engine.evaluate({"stack_height": 90}, step=1)
+        assert result == "emergency_clear"
+
+    def test_from_genre_themepark(self) -> None:
+        engine = AdaptiveStrategyEngine.from_genre("themepark")
+        result = engine.evaluate({"money": 500}, step=1)
+        assert result == "cost_reduction"
+
+    def test_from_genre_unknown_raises(self) -> None:
+        import pytest
+        with pytest.raises(ValueError, match="Unknown genre"):
+            AdaptiveStrategyEngine.from_genre("unknown_genre")
+
+    def test_from_json_config_file(self, tmp_path) -> None:
+        import json
+        config = {
+            "thresholds": [
+                {"parameter": "fuel", "operator": "lt", "value": 10, "target_strategy": "refuel", "priority": 10},
+            ]
+        }
+        config_file = tmp_path / "custom.json"
+        config_file.write_text(json.dumps(config))
+        engine = AdaptiveStrategyEngine.from_json(config_file)
+        result = engine.evaluate({"fuel": 5}, step=1)
+        assert result == "refuel"
+
 
 class TestParseAndValidateResponse:
     """Tests for _parse_and_validate_response()."""
