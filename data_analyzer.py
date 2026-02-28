@@ -101,44 +101,45 @@ class CausalChainExtractor:
 
         for i, col_a in enumerate(cols):
             for col_b in cols[i + 1 :]:
-                best_lag = 0
-                best_corr = 0.0
-                best_pval = 1.0
+                for source, target in [(col_a, col_b), (col_b, col_a)]:
+                    best_lag = 0
+                    best_corr = 0.0
+                    best_pval = 1.0
 
-                for lag in range(1, max_lag + 1):
-                    a = self.df[col_a].iloc[:-lag].values
-                    b = self.df[col_b].iloc[lag:].values
+                    for lag in range(1, max_lag + 1):
+                        a = self.df[source].iloc[:-lag].values
+                        b = self.df[target].iloc[lag:].values
 
-                    if len(a) < 10:
-                        continue
+                        if len(a) < 10:
+                            continue
 
-                    # Remove NaN
-                    mask = ~(np.isnan(a) | np.isnan(b))
-                    a, b = a[mask], b[mask]
+                        # Remove NaN
+                        mask = ~(np.isnan(a) | np.isnan(b))
+                        a, b = a[mask], b[mask]
 
-                    if len(a) < 10:
-                        continue
+                        if len(a) < 10:
+                            continue
 
-                    corr, pval = stats.pearsonr(a, b)
+                        corr, pval = stats.pearsonr(a, b)
 
-                    if abs(corr) > abs(best_corr):
-                        best_corr = corr
-                        best_lag = lag
-                        best_pval = pval
+                        if abs(corr) > abs(best_corr):
+                            best_corr = corr
+                            best_lag = lag
+                            best_pval = pval
 
-                if abs(best_corr) > 0.3 and best_pval < 0.05:
-                    key = f"{col_a} -> {col_b}"
-                    results[key] = {
-                        "source": col_a,
-                        "target": col_b,
-                        "lag": best_lag,
-                        "correlation": round(best_corr, 4),
-                        "p_value": round(best_pval, 6),
-                    }
-                    logger.info(
-                        "  Lag correlation: %s -> %s (lag=%d, r=%.3f, p=%.4f)",
-                        col_a, col_b, best_lag, best_corr, best_pval,
-                    )
+                    if abs(best_corr) > 0.3 and best_pval < 0.05:
+                        key = f"{source} -> {target}"
+                        results[key] = {
+                            "source": source,
+                            "target": target,
+                            "lag": best_lag,
+                            "correlation": round(best_corr, 4),
+                            "p_value": round(best_pval, 6),
+                        }
+                        logger.info(
+                            "  Lag correlation: %s -> %s (lag=%d, r=%.3f, p=%.4f)",
+                            source, target, best_lag, best_corr, best_pval,
+                        )
 
         self.lag_correlations = results
         logger.info("Found %d significant lag correlations.", len(results))
@@ -399,6 +400,10 @@ def generate_sample_data(
 
 def main() -> None:
     """CLI entry point."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="Gameplay Data Causal Chain Analyzer")
     parser.add_argument(
         "--logs",

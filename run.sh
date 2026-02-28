@@ -5,10 +5,18 @@ set -euo pipefail
 # Starts Xvfb, DuckStation, memory logger, and AI agent.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DUCKSTATION="${SCRIPT_DIR}/duckstation/DuckStation.AppImage"
+DUCKSTATION="${DUCKSTATION_PATH:-${SCRIPT_DIR}/duckstation/DuckStation.AppImage}"
 VENV_PYTHON="${SCRIPT_DIR}/venv/bin/python"
 DISPLAY_NUM=99
 PIDS=()
+
+# Load .env file if it exists (does not override already-set variables)
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "${SCRIPT_DIR}/.env"
+    set +a
+fi
 
 # Default arguments
 GAME_ID=""
@@ -34,6 +42,11 @@ usage() {
     echo "  --openai-key KEY      OpenAI API key (default: OPENAI_API_KEY env var)"
     echo "  --no-xvfb             Skip Xvfb (use existing display)"
     echo "  --help                Show this help"
+    echo ""
+    echo "Environment variables:"
+    echo "  OPENAI_API_KEY        OpenAI API key (can also use --openai-key)"
+    echo "  DUCKSTATION_PATH      Path to DuckStation AppImage (default: ./duckstation/DuckStation.AppImage)"
+    echo "  DISPLAY_NUM           Virtual display number for Xvfb (default: 99)"
     exit 1
 }
 
@@ -186,20 +199,20 @@ echo "=== Session Complete ==="
 echo "Logs saved in: ${SCRIPT_DIR}/logs/"
 
 # Step 5: Auto-run analysis pipeline on collected logs
-LATEST_LOGS=$(ls -t "${SCRIPT_DIR}"/logs/*_${GAME_ID}*.csv 2>/dev/null | head -5)
+mapfile -t LATEST_LOGS < <(ls -t "${SCRIPT_DIR}"/logs/*_"${GAME_ID}"*.csv 2>/dev/null | head -5)
 
-if [ -n "$LATEST_LOGS" ]; then
+if [ ${#LATEST_LOGS[@]} -gt 0 ]; then
     echo ""
     echo "[5/5] Running post-session analysis pipeline..."
     "$PYTHON" "${SCRIPT_DIR}/pipeline.py" \
-        --logs $LATEST_LOGS \
+        --logs "${LATEST_LOGS[@]}" \
         --game "$GAME_ID" \
         --skip-sim || {
         echo "Warning: Pipeline analysis failed (non-fatal)."
     }
 
     # Generate visualizations if CSV logs exist
-    FIRST_LOG=$(echo "$LATEST_LOGS" | head -1)
+    FIRST_LOG="${LATEST_LOGS[0]}"
     LATEST_CHAINS=$(ls -t "${SCRIPT_DIR}"/reports/causal_chains_*.json 2>/dev/null | head -1)
     if [ -n "$FIRST_LOG" ]; then
         echo "Generating visualizations..."
@@ -213,5 +226,5 @@ if [ -n "$LATEST_LOGS" ]; then
     echo "Reports saved in: ${SCRIPT_DIR}/reports/"
 else
     echo "No logs found for ${GAME_ID}. Skipping analysis."
-    echo "To run manually: $PYTHON ${SCRIPT_DIR}/pipeline.py --logs ${SCRIPT_DIR}/logs/*.csv --game ${GAME_ID}"
+    echo "To run manually: $PYTHON ${SCRIPT_DIR}/pipeline.py --logs \"${SCRIPT_DIR}/logs/*.csv\" --game \"${GAME_ID}\""
 fi

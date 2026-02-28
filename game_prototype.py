@@ -19,6 +19,72 @@ from pathlib import Path
 from typing import Any
 
 
+def _parse_markdown_tables(content: str) -> list[list[dict[str, str]]]:
+    """Parse all Markdown tables in *content*.
+
+    Each table is returned as a list of row dicts whose keys are the
+    column headers (whitespace-stripped).  Separator rows (``|---|---|``)
+    are consumed and never returned.
+
+    Returns:
+        List of tables.  Each table is a ``list[dict[str, str]]``.
+    """
+    tables: list[list[dict[str, str]]] = []
+    lines = content.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        # A table header row starts and ends with ``|``.
+        if line.startswith("|") and line.endswith("|") and "|" in line[1:-1]:
+            # Next line must be the separator (e.g. |---|---|)
+            if i + 1 < len(lines) and re.match(
+                r"^\|[\s\-:|]+\|$", lines[i + 1].strip()
+            ):
+                headers = [h.strip() for h in line.strip("|").split("|")]
+                i += 2  # skip header + separator
+                rows: list[dict[str, str]] = []
+                while i < len(lines):
+                    row_line = lines[i].strip()
+                    if not row_line.startswith("|"):
+                        break
+                    cells = [c.strip() for c in row_line.strip("|").split("|")]
+                    row: dict[str, str] = {}
+                    for j, hdr in enumerate(headers):
+                        row[hdr] = cells[j] if j < len(cells) else ""
+                    rows.append(row)
+                    i += 1
+                if rows:
+                    tables.append(rows)
+                continue
+        i += 1
+    return tables
+
+
+def _find_table(
+    tables: list[list[dict[str, str]]],
+    *required_headers: str,
+) -> list[dict[str, str]] | None:
+    """Return the first table whose rows contain all *required_headers*.
+
+    Header comparison is case-insensitive.
+    """
+    needed = {h.lower() for h in required_headers}
+    for table in tables:
+        if table:
+            available = {k.lower() for k in table[0]}
+            if needed <= available:
+                return table
+    return None
+
+
+def _safe_float(value: str) -> float | None:
+    """Try to parse *value* as a float, return ``None`` on failure."""
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
 @dataclass
 class VisitorAgent:
     """A park visitor with internal state attributes."""
@@ -390,7 +456,17 @@ class ParkSimulator:
     def from_gdd(cls, gdd_path: Path) -> ParkSimulator:
         """Create a ParkSimulator with parameters extracted from a GDD file.
 
-        Parses the GDD markdown for threshold values and parameter definitions.
+        Parses Markdown tables in the GDD for parameter statistics and
+        strategy thresholds.  Three tables are recognised by their column
+        headers (case-insensitive):
+
+        * **Descriptive Statistics** (``Parameter | Min | Max | Mean | …``):
+          ``Mean`` values populate the parameter map.
+        * **Parameter Interactions** (``Source | Target | Lag | Correlation``):
+          stored for informational purposes; not yet wired into the sim.
+        * **Strategy Modes** (``Strategy | Trigger Condition | …``):
+          ``param > N`` / ``param < N`` patterns inside *Trigger Condition*
+          cells are parsed as threshold overrides.
 
         Args:
             gdd_path: Path to GDD markdown file.
@@ -399,26 +475,49 @@ class ParkSimulator:
             Configured ParkSimulator.
         """
         content = gdd_path.read_text()
+        tables = _parse_markdown_tables(content)
         params: dict[str, float] = {}
 
-        # Extract numeric parameters from markdown tables and text
-        # Pattern: parameter_name: value or |parameter|value|
-        for match in re.finditer(
-            r"(\w+)[\s:=]+(\d+\.?\d*)", content
-        ):
-            name = match.group(1).lower()
-            try:
-                params[name] = float(match.group(2))
-            except ValueError:
-                continue
+        # --- 1. Descriptive Statistics → parameter Mean values -----------
+        stats_table = _find_table(tables, "Parameter", "Mean")
+        if stats_table:
+            for row in stats_table:
+                name = row.get("Parameter", "").strip().lower()
+                mean = _safe_float(row.get("Mean", ""))
+                if name and mean is not None:
+                    params[name] = mean
 
+        # --- 2. Strategy Modes → threshold conditions --------------------
+        strategy_table = _find_table(tables, "Strategy", "Trigger Condition")
+        if strategy_table:
+            for row in strategy_table:
+                condition = row.get("Trigger Condition", "")
+                for m in re.finditer(
+                    r"(\w+)\s*[<>]=?\s*([\d.]+)", condition
+                ):
+                    pname = m.group(1).lower()
+                    pval = _safe_float(m.group(2))
+                    if pval is not None:
+                        key = f"{pname}_threshold"
+                        # Keep the first occurrence per parameter.
+                        if key not in params:
+                            params[key] = pval
+
+        # --- 3. Parameter Interactions (informational) -------------------
+        interactions_table = _find_table(
+            tables, "Source", "Target", "Lag", "Correlation"
+        )
+        # Reserved for future use; correlations are not yet wired into
+        # the simulation engine.
+
+        # --- Build the simulation ----------------------------------------
         sim = cls()
 
-        # Create default attractions
+        # Attractions — use ride_intensity mean from stats if available.
         sim.attractions = [
             RideAttraction(
                 name="Roller Coaster",
-                intensity=params.get("intensity", 80.0),
+                intensity=params.get("ride_intensity", 80.0),
                 satisfaction_boost=params.get("satisfaction_boost", 15.0),
             ),
             RideAttraction(
@@ -433,18 +532,29 @@ class ParkSimulator:
             ),
         ]
 
-        # Create initial visitors
+        # Visitor thresholds — strategy-table thresholds take precedence
+        # (e.g.  ``nausea > 70`` in the satisfaction strategy row), with
+        # explicit param keys as first-choice overrides.
         visitor_params = {
-            "nausea_vomit_threshold": params.get("nausea_vomit_threshold", 80.0),
+            "nausea_vomit_threshold": params.get(
+                "nausea_vomit_threshold",
+                params.get("nausea_threshold", 80.0),
+            ),
             "hunger_seek_food_threshold": params.get(
-                "hunger_seek_food_threshold", 70.0
+                "hunger_seek_food_threshold",
+                params.get("hunger_threshold", 70.0),
             ),
             "vomit_satisfaction_penalty": params.get(
                 "vomit_satisfaction_penalty", 20.0
             ),
         }
 
-        for i in range(int(params.get("initial_visitors", 20))):
+        # Initial visitor count — prefer explicit key, then the Mean
+        # from Descriptive Statistics, then default 20.
+        initial_visitors = int(
+            params.get("initial_visitors", params.get("visitors", 20))
+        )
+        for i in range(initial_visitors):
             sim.visitors.append(VisitorAgent.from_gdd(visitor_params, visitor_id=i))
 
         print(

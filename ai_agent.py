@@ -1343,6 +1343,10 @@ class AIAgent:
 
 def main() -> None:
     """CLI entry point."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="PS1 AI Player Agent")
     parser.add_argument("--game", "-g", required=True, help="Game ID")
     parser.add_argument(

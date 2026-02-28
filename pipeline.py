@@ -135,6 +135,10 @@ def run_simulation(
 
 def main() -> None:
     """CLI entry point for the full pipeline."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     parser = argparse.ArgumentParser(
         description="PS1 AI Player: End-to-end analysis pipeline"
     )

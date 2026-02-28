@@ -75,7 +75,8 @@ fi
 
 source "${VENV_DIR}/bin/activate"
 pip install --upgrade pip -q
-pip install -r "${PROJECT_DIR}/requirements.txt" -q
+pip install -q "${PROJECT_DIR}"
+pip install -q "${PROJECT_DIR}[dev]"
 
 echo "[5/5] Verifying installation..."
 

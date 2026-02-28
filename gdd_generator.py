@@ -189,10 +189,55 @@ class GDDGenerator:
         lines.append("")
         return "\n".join(lines)
 
+    @staticmethod
+    def _find_cycles(
+        edges: dict[str, list[tuple[str, float]]],
+    ) -> list[list[tuple[str, str, float]]]:
+        """Find all elementary cycles in a directed graph using DFS.
+
+        Uses a Johnson-style approach: for each node as a potential cycle
+        start, perform DFS only visiting nodes >= start (lexicographic)
+        to avoid finding the same cycle multiple times.
+
+        Args:
+            edges: Adjacency dict mapping source to list of (target, correlation).
+
+        Returns:
+            List of cycles. Each cycle is a list of (source, target, correlation) edges.
+        """
+        all_nodes: set[str] = set(edges.keys())
+        for targets in edges.values():
+            for tgt, _ in targets:
+                all_nodes.add(tgt)
+        nodes = sorted(all_nodes)
+
+        cycles: list[list[tuple[str, str, float]]] = []
+
+        for start in nodes:
+            # DFS from start, only visiting nodes > start (to avoid duplicates)
+            stack: list[tuple[str, list[str], list[float]]] = [(start, [start], [])]
+            while stack:
+                current, path, corrs = stack.pop()
+                for neighbor, corr in edges.get(current, []):
+                    if neighbor == start and len(path) >= 2:
+                        # Found a cycle
+                        cycle_edges: list[tuple[str, str, float]] = []
+                        for k in range(len(path) - 1):
+                            cycle_edges.append((path[k], path[k + 1], corrs[k]))
+                        cycle_edges.append((current, start, corr))
+                        cycles.append(cycle_edges)
+                    elif neighbor not in path and neighbor > start:
+                        stack.append((neighbor, path + [neighbor], corrs + [corr]))
+
+        return cycles
+
     def generate_feedback_loops_section(self) -> str:
         """Generate a section documenting positive/negative feedback loops.
 
-        Analyzes causal chains for circular dependencies and reinforcing patterns.
+        Detects all elementary cycles (2-node and longer) in the directed
+        graph built from lag correlations.  Classifies each cycle as
+        positive (reinforcing) or negative (balancing) based on the product
+        of edge correlations around the cycle.
 
         Returns:
             Markdown text for the feedback loops section.
@@ -204,7 +249,7 @@ class GDDGenerator:
             lines.append("No feedback loops detected (insufficient lag correlation data).\n")
             return "\n".join(lines)
 
-        # Build adjacency from lag correlations to find loops
+        # Build adjacency from lag correlations
         edges: dict[str, list[tuple[str, float]]] = {}
         for _key, data in lag_corrs.items():
             src = data.get("source", "")
@@ -213,30 +258,47 @@ class GDDGenerator:
             if src and tgt:
                 edges.setdefault(src, []).append((tgt, corr))
 
-        # Detect 2-node cycles (A→B and B→A)
+        # Find all elementary cycles
+        all_cycles = self._find_cycles(edges)
+
         positive_loops: list[str] = []
         negative_loops: list[str] = []
-        seen_pairs: set[tuple[str, str]] = set()
 
-        for src, targets in edges.items():
-            for tgt, corr_ab in targets:
-                if (tgt, src) in seen_pairs:
-                    continue
-                if tgt in edges:
-                    for back_tgt, corr_ba in edges[tgt]:
-                        if back_tgt == src:
-                            seen_pairs.add((src, tgt))
-                            loop_type = "positive" if corr_ab * corr_ba > 0 else "negative"
-                            desc = (
-                                f"- **{src} ↔ {tgt}**: "
-                                f"{src}→{tgt} (r={corr_ab:.3f}), "
-                                f"{tgt}→{src} (r={corr_ba:.3f}) "
-                                f"— {loop_type} feedback"
-                            )
-                            if loop_type == "positive":
-                                positive_loops.append(desc)
-                            else:
-                                negative_loops.append(desc)
+        for cycle_edges in all_cycles:
+            # Classify: product of correlations > 0 → positive, else negative
+            product = 1.0
+            for _, _, corr in cycle_edges:
+                product *= corr
+            loop_type = "positive" if product > 0 else "negative"
+
+            # Format description
+            if len(cycle_edges) == 2:
+                # 2-node cycle: A ↔ B
+                a, b, corr_ab = cycle_edges[0]
+                _, _, corr_ba = cycle_edges[1]
+                desc = (
+                    f"- **{a} ↔ {b}**: "
+                    f"{a}→{b} (r={corr_ab:.3f}), "
+                    f"{b}→{a} (r={corr_ba:.3f}) "
+                    f"— {loop_type} feedback"
+                )
+            else:
+                # 3+ node cycle: A → B → C → A
+                node_names = [e[0] for e in cycle_edges]
+                arrow_chain = " → ".join(node_names) + " → " + node_names[0]
+                edge_details = ", ".join(
+                    f"{s}→{t} (r={c:.3f})" for s, t, c in cycle_edges
+                )
+                desc = (
+                    f"- **{arrow_chain}**: "
+                    f"{edge_details} "
+                    f"— {loop_type} feedback"
+                )
+
+            if loop_type == "positive":
+                positive_loops.append(desc)
+            else:
+                negative_loops.append(desc)
 
         if positive_loops:
             lines.append("### Positive (Reinforcing) Loops\n")
@@ -905,6 +967,10 @@ class GDDGenerator:
 
 def main() -> None:
     """CLI entry point."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="Auto-generate GDD from causal chains or CSV")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(

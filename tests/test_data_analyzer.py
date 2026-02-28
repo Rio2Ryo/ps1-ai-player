@@ -77,6 +77,29 @@ def test_save_results(sample_csv_path: Path, tmp_path: Path) -> None:
     assert "total_samples" in data
 
 
+def test_detect_lag_correlations_bidirectional(sample_csv_path: Path) -> None:
+    """Lag detection should check both A→B and B→A directions."""
+    ext = CausalChainExtractor()
+    ext.load_logs([sample_csv_path])
+    ext.compute_correlations()
+    results = ext.detect_lag_correlations(max_lag=10)
+
+    # Collect all (source, target) pairs
+    pairs = {(d["source"], d["target"]) for d in results.values()}
+
+    # For at least one pair, both directions should be present
+    has_bidirectional = False
+    for src, tgt in pairs:
+        if (tgt, src) in pairs:
+            has_bidirectional = True
+            break
+
+    assert has_bidirectional, (
+        "Expected at least one bidirectional pair (A→B and B→A) "
+        f"but found only: {sorted(pairs)}"
+    )
+
+
 def test_empty_logs() -> None:
     """Handles empty log list gracefully."""
     ext = CausalChainExtractor()

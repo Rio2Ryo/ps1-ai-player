@@ -377,3 +377,88 @@ def test_build_llm_prompt_default_is_ja() -> None:
     """No lang argument should default to Japanese."""
     prompt = GDDGenerator._build_llm_prompt("{}", "{}")
     assert "日本語で記述してください" in prompt
+
+
+# ------------------------------------------------------------------
+# N-node cycle detection tests
+# ------------------------------------------------------------------
+
+
+def test_feedback_loops_3_node_cycle() -> None:
+    """Detect a 3-node cycle A → B → C → A."""
+    gen = GDDGenerator()
+    gen.chains = []
+    gen.metadata = {
+        "parameters": ["alpha", "beta", "gamma"],
+        "lag_correlations": {
+            "alpha -> beta": {
+                "source": "alpha",
+                "target": "beta",
+                "lag": 3,
+                "correlation": 0.7,
+                "p_value": 0.001,
+            },
+            "beta -> gamma": {
+                "source": "beta",
+                "target": "gamma",
+                "lag": 4,
+                "correlation": 0.5,
+                "p_value": 0.01,
+            },
+            "gamma -> alpha": {
+                "source": "gamma",
+                "target": "alpha",
+                "lag": 2,
+                "correlation": 0.6,
+                "p_value": 0.005,
+            },
+        },
+    }
+    text = gen.generate_feedback_loops_section()
+    assert "## Feedback Loops" in text
+    # Should detect the 3-node cycle
+    assert "alpha" in text
+    assert "beta" in text
+    assert "gamma" in text
+    # All positive correlations → product > 0 → positive feedback
+    assert "positive feedback" in text
+
+
+def test_feedback_loops_3_node_negative_cycle() -> None:
+    """A 3-node cycle with odd number of negative edges is negative feedback."""
+    gen = GDDGenerator()
+    gen.chains = []
+    gen.metadata = {
+        "parameters": ["x", "y", "z"],
+        "lag_correlations": {
+            "x -> y": {
+                "source": "x", "target": "y",
+                "lag": 2, "correlation": 0.6, "p_value": 0.01,
+            },
+            "y -> z": {
+                "source": "y", "target": "z",
+                "lag": 3, "correlation": -0.5, "p_value": 0.02,
+            },
+            "z -> x": {
+                "source": "z", "target": "x",
+                "lag": 1, "correlation": 0.4, "p_value": 0.03,
+            },
+        },
+    }
+    text = gen.generate_feedback_loops_section()
+    # Product: 0.6 * (-0.5) * 0.4 = -0.12 → negative
+    assert "negative feedback" in text
+
+
+def test_find_cycles_static() -> None:
+    """Direct test of the _find_cycles static method."""
+    edges = {
+        "A": [("B", 0.5)],
+        "B": [("C", 0.6), ("A", 0.4)],
+        "C": [("A", 0.7)],
+    }
+    cycles = GDDGenerator._find_cycles(edges)
+    # Should find 2-node cycle A↔B and 3-node cycle A→B→C→A
+    assert len(cycles) == 2
+    cycle_lengths = sorted(len(c) for c in cycles)
+    assert cycle_lengths == [2, 3]

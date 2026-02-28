@@ -44,7 +44,7 @@ pipeline.py (post-session analysis)
 | `lua_logger_template.lua` | DuckStation Lua script for in-emulator logging |
 | `lua_generator.py` | Auto-generate Lua scripts from address JSON |
 | `ai_agent.py` | Main agent: screenshot → GPT-4o → keyboard input loop |
-| `data_analyzer.py` | Pearson + lag cross-correlation → causal chains |
+| `data_analyzer.py` | Pearson + bidirectional lag cross-correlation → causal chains |
 | `gdd_generator.py` | Causal chains or CSV → GDD (local + GPT-4), JSON export |
 | `game_prototype.py` | Theme park simulator with from_gdd() + CSV export |
 | `pipeline.py` | End-to-end: logs → analysis → GDD → prototype |
@@ -52,7 +52,9 @@ pipeline.py (post-session analysis)
 | `log_config.py` | Shared Python logging configuration |
 | `run.sh` | Master launcher (Xvfb → DuckStation → logger → agent → pipeline) |
 | `sample_data/generate_sample.py` | Standalone synthetic data generator (stdlib-only) |
-| `tests/` | pytest suite (115 tests) |
+| `preflight_check.py` | E2E pre-flight checker (ISO/BIOS/DuckStation/venv/API key) |
+| `tests/` | pytest suite (260 tests) |
+| `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `pyproject.toml` | Project metadata + pytest configuration |
 
 ## Dev Commands
@@ -121,7 +123,7 @@ python lua_generator.py --game SLPM-86023
 - **Multi-language support**: `GPT4VAnalyzer` system prompt includes Japanese text recognition instructions (kanji/hiragana/katakana). `analyze_screen()` accepts `game_state` and `lang_hint` params. `AIAgent --lang ja/en` CLI flag
 - **GDD language selection**: `generate_full_gdd(lang="ja"|"en")` and `_build_llm_prompt()` static method for language-specific LLM prompts. CLI `--lang` in both `gdd_generator.py` and `pipeline.py`
 - **Loading state skip**: Agent skips keyboard input during GAME_STATE_LOADING to avoid wasted actions
-- **GDD feedback loops**: `gdd_generator.py` detects positive/negative feedback loops from lag correlation adjacency
+- **GDD feedback loops**: `gdd_generator.py` detects positive/negative feedback loops via DFS-based elementary cycle enumeration (`_find_cycles()`). Supports 2-node and 3+ node cycles. Cycle type classified by product of edge correlations
 - **GDD from CSV**: `GDDGenerator.from_csv()` accepts CSV files directly — runs CausalChainExtractor internally
 - **GDD sections**: Descriptive statistics, full correlation matrix, data quality report, event/action frequency analysis
 - **GDD JSON export**: `save_gdd(fmt="json"|"both")` for structured output; `to_dict()` for programmatic access
@@ -133,9 +135,66 @@ python lua_generator.py --game SLPM-86023
 - Python 3.10+ with venv at `./venv/`
 - Ubuntu/Debian with Xvfb for headless display
 - DuckStation AppImage at `./duckstation/DuckStation.AppImage`
-- OpenAI API key via `OPENAI_API_KEY` env var
+- OpenAI API key via `OPENAI_API_KEY` env var or `.env` file (`python-dotenv`); see `.env.example`
 
 ## GitHub
 
 - Repo: https://github.com/Rio2Ryo/ps1-ai-player
 - Branch: master
+
+## 🤖 マルチエージェント必須ルール（Ryo指示 2026-02-28）
+
+**複雑なタスクは必ずサブエージェントを並列起動して実装すること。シングルエージェントの直列実行は禁止。**
+
+### いつマルチエージェントを使うか
+- 新機能の実装（フロントエンド・バックエンド・テストを同時並行）
+- リファクタリング（複数ファイルの同時修正）
+- テスト作成（ユニット・E2E・統合テストを並列）
+- バグ修正 + テスト追加の組み合わせ
+
+### 使い方
+Bashツールで並列起動:
+```bash
+claude -p 'フロントエンドの実装' &
+claude -p 'バックエンドAPIの実装' &
+claude -p 'テスト作成' &
+wait
+```
+
+### 分担パターン
+- フロントエンド担当 / バックエンド担当 / テスト担当 / インフラ担当
+
+### ルール
+1. タスクを受け取ったらまず並列化できる単位に分解する
+2. 依存関係のないタスクは必ず並列実行する
+3. 全サブエージェント完了後に統合・コミットする
+4. 完了報告には「何エージェントで並列実行したか」を明記する
+
+## 🤖 マルチエージェント実装ガイド（修正版 2026-02-28）
+
+**重要: 以下のコマンドで実際にサブエージェントを並列起動できる。必ず使うこと。**
+
+```bash
+CLAUDE="/home/kiiocbot/.npm-global/bin/claude"
+
+# 並列実行例（バックグラウンドで同時起動）
+$CLAUDE --dangerously-skip-permissions -p 'フロントエンドの実装タスク' > /tmp/agent1.log 2>&1 &
+PID1=$!
+$CLAUDE --dangerously-skip-permissions -p 'バックエンドAPIの実装タスク' > /tmp/agent2.log 2>&1 &
+PID2=$!
+$CLAUDE --dangerously-skip-permissions -p 'テスト作成タスク' > /tmp/agent3.log 2>&1 &
+PID3=$!
+
+# 全エージェント完了を待つ
+wait $PID1 $PID2 $PID3
+
+# 結果確認
+cat /tmp/agent1.log
+cat /tmp/agent2.log
+cat /tmp/agent3.log
+```
+
+### 必須ルール
+1. 機能実装は必ずフロントエンド/バックエンド/テストを並列起動
+2. タスク受け取り → 分解 → 並列起動 → wait → 統合 → commit の順
+3. 単独で実行するのは小さな修正のみ（1ファイル以内）

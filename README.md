@@ -56,6 +56,141 @@ chmod +x setup.sh
 python setup_duckstation.py
 ```
 
+## PS1 BIOS Setup
+
+DuckStation requires a PS1 BIOS image to run games. **BIOS files are not included
+in this project.** You must extract the BIOS from a PlayStation 1 console that you
+own.
+
+### Supported BIOS files
+
+DuckStation auto-detects the BIOS by file contents, so the filename does not
+matter. However, the conventional names and their regions are listed below for
+reference:
+
+| File name        | Model     | Region     | Notes                       |
+|------------------|-----------|------------|-----------------------------|
+| `scph1001.bin`   | SCPH-1001 | North America (NTSC-U) | v2.2, most commonly used |
+| `scph5500.bin`   | SCPH-5500 | Japan (NTSC-J)         | v3.0                  |
+| `scph5501.bin`   | SCPH-5501 | North America (NTSC-U) | v3.0                  |
+| `scph5502.bin`   | SCPH-5502 | Europe (PAL)           | v3.0                  |
+| `scph7001.bin`   | SCPH-7001 | North America (NTSC-U) | v4.1                  |
+| `scph7501.bin`   | SCPH-7501 | North America (NTSC-U) | v4.1                  |
+| `scph101.bin`    | SCPH-101  | North America (NTSC-U) | PSone slim, v4.5      |
+
+Each file should be exactly **512 KB** (524,288 bytes). If the file size differs,
+the dump was likely unsuccessful.
+
+> **Tip**: Match the BIOS region to your game disc region. Japanese games (SLPM/SLPS)
+> work best with `scph5500.bin`, North American games (SLUS/SCUS) with `scph5501.bin`,
+> and European games (SLES/SCES) with `scph5502.bin`. DuckStation can also use any
+> region BIOS with `Region = Auto` (the default in our configuration).
+
+### Extracting BIOS from your own PS1 console
+
+Dumping the BIOS from a real PlayStation is the only legal method to obtain the
+file. Several approaches exist:
+
+#### Method A: Using a FreePSXBoot memory card exploit (no mod chip required)
+
+FreePSXBoot is a softmod that boots a payload from a specially crafted memory card
+save. No hardware modification is needed.
+
+1. **Prepare a memory card image**: Download the FreePSXBoot builder from
+   <https://github.com/brad-lin/FreePSXBoot> and select your console model.
+2. **Write the image to a real PS1 memory card** using a USB memory card adapter
+   (e.g., PS3 Memory Card Adaptor, DexDrive, or a generic USB reader) and a tool
+   such as MemcardRex or the `mcdtool` CLI.
+3. **Insert the memory card** into Slot 1 of your PS1 and power on. The exploit
+   payload runs automatically and presents a menu.
+4. **Select "Dump BIOS"** and follow on-screen instructions. The BIOS is written
+   to the second memory card in Slot 2.
+5. **Read the memory card** back on your PC with the USB adapter to retrieve
+   the 512 KB BIOS file.
+
+#### Method B: Using a modded console (mod chip / swap trick)
+
+If your console has a mod chip or you can perform the disc-swap trick:
+
+1. **Burn a BIOS dumper disc** — the `psxexe` BIOS dumper
+   (<https://www.psdevwiki.com/ps1/BIOS_Dumper>) is a minimal homebrew that
+   reads the BIOS ROM and writes it to a memory card.
+2. **Boot the disc** on your PS1.
+3. **Transfer the memory card save** to PC as described above.
+
+#### Method C: Using a parallel port / serial cable (advanced)
+
+Older PS1 models (SCPH-1001 through SCPH-750x) have a parallel I/O port on the
+back. With a custom parallel cable and `catflap` or `nops` on the host PC, you
+can upload a BIOS dumper over the wire and receive the dump directly over serial
+without needing a memory card.
+
+### Placing the BIOS file
+
+`setup_duckstation.py` configures DuckStation to search for BIOS files in:
+
+```
+~/.config/duckstation/bios/
+```
+
+Copy your extracted BIOS file(s) into that directory:
+
+```bash
+# Create the directory (setup_duckstation.py also creates this automatically)
+mkdir -p ~/.config/duckstation/bios
+
+# Copy your BIOS file
+cp /path/to/scph5501.bin ~/.config/duckstation/bios/
+
+# Verify the file size (should be exactly 512 KB)
+ls -l ~/.config/duckstation/bios/
+# -rw-r--r-- 1 user user 524288 ... scph5501.bin
+```
+
+### Configuration via setup_duckstation.py
+
+Running `python setup_duckstation.py` generates `~/.config/duckstation/settings.ini`
+with the following BIOS-related settings:
+
+```ini
+[BIOS]
+SearchDirectory = /home/<user>/.config/duckstation/bios
+PatchFastBoot = true
+```
+
+- **SearchDirectory**: DuckStation scans this directory for valid BIOS files.
+  You can override it with `--config-dir`:
+  ```bash
+  python setup_duckstation.py --config-dir /custom/path/duckstation
+  # BIOS directory becomes: /custom/path/duckstation/bios/
+  ```
+- **PatchFastBoot**: Skips the PS1 boot logo animation and loads the game
+  directly. This is enabled by default for faster automated sessions.
+
+### Verifying the BIOS is recognized
+
+After placing the file and running `setup_duckstation.py`, start DuckStation
+manually to confirm:
+
+```bash
+# If using the AppImage
+./duckstation/DuckStation.AppImage
+
+# Go to Settings -> BIOS Settings
+# The BIOS file should appear in the list with its region and version
+```
+
+If the BIOS does not appear, check that:
+1. The file is in `~/.config/duckstation/bios/`
+2. The file is exactly 512 KB (524,288 bytes)
+3. The file is not corrupted (compare the MD5 hash against known good hashes)
+
+**Legal Notice**: The PS1 BIOS is copyrighted by Sony. You may only use a BIOS
+file that you have personally extracted from a console you own. Downloading BIOS
+files from the internet is a copyright violation.
+
+---
+
 ## ISO Preparation
 
 You must provide your own PS1 game ISOs. Place them in `~/ps1-ai-player/isos/`.
@@ -216,7 +351,7 @@ python game_prototype.py --from-gdd ~/ps1-ai-player/reports/GDD_SLPM-86023_*.md
   setup.sh                  # Environment setup
   setup_duckstation.py      # DuckStation configuration
   run.sh                    # Master launch script
-  requirements.txt          # Python dependencies
+  pyproject.toml            # Project metadata & dependencies
   memory_scanner.py         # /proc/PID/mem based scanner
   address_manager.py        # Address JSON management
   memory_logger.py          # Periodic CSV logger
