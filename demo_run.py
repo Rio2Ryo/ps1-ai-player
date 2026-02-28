@@ -2,12 +2,13 @@
 """End-to-end demo: sample data → causal analysis → GDD → charts → simulation.
 
 Demonstrates the full PS1 AI Player analysis pipeline without requiring
-DuckStation, PS1 ISO, BIOS, or an OpenAI API key.  Uses the synthetic
-theme-park data in sample_data/sample_log.csv (auto-generated if missing).
+DuckStation, PS1 ISO, BIOS, or an OpenAI API key.  Supports multiple game
+genres (themepark, rpg, action) with auto-generated sample data.
 
 Usage:
     python demo_run.py
-    python demo_run.py --frames 1200 --output-dir reports/custom
+    python demo_run.py --genre rpg
+    python demo_run.py --genre action --frames 1200 --output-dir reports/custom
 """
 
 from __future__ import annotations
@@ -18,21 +19,27 @@ import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-SAMPLE_CSV = PROJECT_ROOT / "sample_data" / "sample_log.csv"
-GAME_ID = "DEMO"
+
+GENRE_SAMPLES: dict[str, tuple[str, str]] = {
+    # genre: (csv_filename, generator_module_name)
+    "themepark": ("sample_log.csv", "generate_sample"),
+    "rpg": ("rpg_sample_log.csv", "generate_rpg_sample"),
+    "action": ("action_sample_log.csv", "generate_action_sample"),
+}
 
 
-def _ensure_sample_data(csv_path: Path) -> Path:
-    """Generate sample CSV if it does not exist."""
+def _ensure_sample_data(genre: str) -> Path:
+    """Generate sample CSV for the given genre if it does not exist."""
+    csv_name, gen_module = GENRE_SAMPLES[genre]
+    csv_path = PROJECT_ROOT / "sample_data" / csv_name
     if csv_path.exists():
         print(f"[sample] Found existing data: {csv_path}")
         return csv_path
 
-    print("[sample] sample_log.csv not found — generating …")
+    print(f"[sample] {csv_name} not found — generating …")
     sys.path.insert(0, str(csv_path.parent))
-    from generate_sample import generate
-
-    generate(output_path=csv_path)
+    mod = __import__(gen_module)
+    mod.generate(output_path=csv_path)
     sys.path.pop(0)
     return csv_path
 
@@ -40,27 +47,34 @@ def _ensure_sample_data(csv_path: Path) -> Path:
 def run_demo(
     frames: int = 600,
     output_dir: Path | None = None,
+    genre: str = "themepark",
 ) -> list[Path]:
     """Execute the full demo pipeline and return generated file paths.
 
     Args:
         frames: Number of simulation frames.
         output_dir: Directory for all outputs (created automatically).
+        genre: Game genre for demo data (default: themepark).
 
     Returns:
         List of files created during the demo.
     """
+    game_id = f"DEMO_{genre.upper()}"
+
     output_dir = output_dir or PROJECT_ROOT / "reports" / "demo"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     generated_files: list[Path] = []
     t_total = time.time()
 
+    print(f"PS1 AI Player Demo — genre: {genre}")
+    print()
+
     # ------------------------------------------------------------------
     # Step 0: Ensure sample data exists
     # ------------------------------------------------------------------
     t0 = time.time()
-    csv_path = _ensure_sample_data(SAMPLE_CSV)
+    csv_path = _ensure_sample_data(genre)
     print(f"  → elapsed: {time.time() - t0:.2f}s\n")
 
     # ------------------------------------------------------------------
@@ -99,8 +113,8 @@ def run_demo(
     generator.load_causal_chains(chains_path)
     if not extractor.df.empty:
         generator.raw_df = extractor.df
-    gdd_content = generator.generate_local_gdd(game_id=GAME_ID)
-    gdd_path = generator.save_gdd(gdd_content, game_id=GAME_ID, output_dir=output_dir)
+    gdd_content = generator.generate_local_gdd(game_id=game_id)
+    gdd_path = generator.save_gdd(gdd_content, game_id=game_id, output_dir=output_dir)
     generated_files.append(gdd_path)
 
     print(f"  GDD length: {len(gdd_content)} chars")
@@ -129,25 +143,29 @@ def run_demo(
     print(f"  → elapsed: {time.time() - t0:.2f}s\n")
 
     # ------------------------------------------------------------------
-    # Step 4: Simulation
+    # Step 4: Simulation (themepark only)
     # ------------------------------------------------------------------
     print("=" * 60)
     print(f"STEP 4: Simulation ({frames} frames)")
     print("=" * 60)
-    t0 = time.time()
 
-    from game_prototype import ParkSimulator
+    if genre == "themepark":
+        t0 = time.time()
 
-    sim = ParkSimulator.from_gdd(gdd_path)
-    sim_csv_path = output_dir / "simulation_output.csv"
-    final_state = sim.run(frames=frames, csv_path=sim_csv_path)
-    generated_files.append(sim_csv_path)
+        from game_prototype import ParkSimulator
 
-    print(f"  Final visitors: {final_state['visitor_count']}")
-    print(f"  Final satisfaction: {final_state['avg_satisfaction']:.1f}")
-    print(f"  Final park money: {final_state['park_money']:.0f}")
-    print(f"  Saved: {sim_csv_path}")
-    print(f"  → elapsed: {time.time() - t0:.2f}s\n")
+        sim = ParkSimulator.from_gdd(gdd_path)
+        sim_csv_path = output_dir / "simulation_output.csv"
+        final_state = sim.run(frames=frames, csv_path=sim_csv_path)
+        generated_files.append(sim_csv_path)
+
+        print(f"  Final visitors: {final_state['visitor_count']}")
+        print(f"  Final satisfaction: {final_state['avg_satisfaction']:.1f}")
+        print(f"  Final park money: {final_state['park_money']:.0f}")
+        print(f"  Saved: {sim_csv_path}")
+        print(f"  → elapsed: {time.time() - t0:.2f}s\n")
+    else:
+        print(f"  [skip] Simulation not available for genre '{genre}' — skipping.\n")
 
     # ------------------------------------------------------------------
     # Summary
@@ -180,8 +198,14 @@ def main() -> None:
         default=None,
         help="Output directory (default: reports/demo)",
     )
+    parser.add_argument(
+        "--genre",
+        default="themepark",
+        choices=list(GENRE_SAMPLES),
+        help="Game genre for demo data (default: themepark)",
+    )
     args = parser.parse_args()
-    run_demo(frames=args.frames, output_dir=args.output_dir)
+    run_demo(frames=args.frames, output_dir=args.output_dir, genre=args.genre)
 
 
 if __name__ == "__main__":

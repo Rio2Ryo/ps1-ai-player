@@ -85,13 +85,15 @@ pipeline.py (post-session analysis)
 | `visualizer.py` | Matplotlib charts: heatmap, time-series, lag bars, causal graph |
 | `log_config.py` | Shared Python logging configuration |
 | `run.sh` | Master launcher (Xvfb → DuckStation → logger → agent → pipeline) |
-| `sample_data/generate_sample.py` | Standalone synthetic data generator (stdlib-only) |
+| `sample_data/generate_sample.py` | Theme park synthetic data generator (stdlib-only) |
+| `sample_data/generate_rpg_sample.py` | RPG dungeon crawl synthetic data generator |
+| `sample_data/generate_action_sample.py` | Action/platformer synthetic data generator |
 | `preflight_check.py` | E2E pre-flight checker (ISO/BIOS/DuckStation/venv/API key) |
-| `demo_run.py` | E2E demo: sample data → analysis → GDD → charts → simulation (no API key needed) |
+| `demo_run.py` | E2E demo: --genre rpg/action/themepark → analysis → GDD → charts (no API key needed) |
 | `sample_data/DEMO.json` | Demo memory address definitions (GameAddresses format) |
 | `sample_data/expected_output/` | Pre-generated pipeline outputs (GDD, causal chains) |
 | `config/strategies/` | Genre-specific strategy configs (rpg, action, sports, puzzle, themepark) |
-| `tests/` | pytest suite (298 tests) |
+| `tests/` | pytest suite (301 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `pyproject.toml` | Project metadata + pytest configuration |
 

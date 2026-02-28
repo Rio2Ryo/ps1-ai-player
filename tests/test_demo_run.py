@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from demo_run import run_demo, _ensure_sample_data
+from demo_run import run_demo, _ensure_sample_data, GENRE_SAMPLES
 
 SAMPLE_CSV = Path(__file__).resolve().parent.parent / "sample_data" / "sample_log.csv"
 
@@ -27,13 +27,8 @@ def test_demo_run_creates_outputs(tmp_path: Path) -> None:
     assert ".csv" in extensions   # simulation output
 
 
-def test_demo_run_generates_sample_if_missing(tmp_path: Path) -> None:
+def test_demo_run_generates_sample_if_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Sample CSV is auto-generated when absent."""
-    fake_csv = tmp_path / "sample_data" / "sample_log.csv"
-    assert not fake_csv.exists()
-
-    # _ensure_sample_data with a missing path triggers generate()
-    # We create a minimal generate_sample.py in the same dir
     sample_dir = tmp_path / "sample_data"
     sample_dir.mkdir()
     gen_script = sample_dir / "generate_sample.py"
@@ -45,7 +40,14 @@ def test_demo_run_generates_sample_if_missing(tmp_path: Path) -> None:
         "    return output_path\n"
     )
 
-    result = _ensure_sample_data(fake_csv)
+    # Point PROJECT_ROOT to tmp_path so _ensure_sample_data looks there
+    import demo_run
+    monkeypatch.setattr(demo_run, "PROJECT_ROOT", tmp_path)
+
+    fake_csv = sample_dir / "sample_log.csv"
+    assert not fake_csv.exists()
+
+    result = _ensure_sample_data("themepark")
     assert result.exists()
     assert "timestamp" in result.read_text()
 
@@ -72,3 +74,39 @@ def test_demo_run_output_dir_created(tmp_path: Path) -> None:
     files = run_demo(frames=10, output_dir=output_dir)
     assert output_dir.exists()
     assert len(files) > 0
+
+
+def test_genre_samples_mapping() -> None:
+    """GENRE_SAMPLES contains expected genres with valid tuples."""
+    assert "themepark" in GENRE_SAMPLES
+    assert "rpg" in GENRE_SAMPLES
+    assert "action" in GENRE_SAMPLES
+    for genre, (csv_name, gen_module) in GENRE_SAMPLES.items():
+        assert csv_name.endswith(".csv"), f"{genre} csv_name should end with .csv"
+        assert isinstance(gen_module, str), f"{genre} gen_module should be a string"
+
+
+def test_demo_run_rpg_genre(tmp_path: Path) -> None:
+    """RPG genre demo runs analysis + GDD + charts, skips simulation."""
+    output_dir = tmp_path / "rpg_out"
+    files = run_demo(frames=60, output_dir=output_dir, genre="rpg")
+
+    assert output_dir.exists()
+    extensions = {p.suffix for p in files}
+    assert ".json" in extensions  # causal chains
+    assert ".md" in extensions    # GDD
+    assert ".png" in extensions   # charts
+    # No simulation CSV for non-themepark genres
+    sim_csvs = [p for p in files if p.name == "simulation_output.csv"]
+    assert len(sim_csvs) == 0
+
+
+def test_demo_run_action_genre(tmp_path: Path) -> None:
+    """Action genre demo runs analysis + GDD + charts, skips simulation."""
+    output_dir = tmp_path / "action_out"
+    files = run_demo(frames=60, output_dir=output_dir, genre="action")
+
+    assert output_dir.exists()
+    extensions = {p.suffix for p in files}
+    assert ".json" in extensions
+    assert ".md" in extensions
