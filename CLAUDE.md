@@ -93,7 +93,7 @@ pipeline.py (post-session analysis)
 | `sample_data/DEMO.json` | Demo memory address definitions (GameAddresses format) |
 | `sample_data/expected_output/` | Pre-generated pipeline outputs (GDD, causal chains) |
 | `config/strategies/` | Genre-specific strategy configs (rpg, action, sports, puzzle, themepark) |
-| `tests/` | pytest suite (301 tests) |
+| `tests/` | pytest suite (347 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `DOCS/STRATEGY_GUIDE.md` | Genre-specific memory address + strategy config setup guide |
 | `pyproject.toml` | Project metadata + pytest configuration |
