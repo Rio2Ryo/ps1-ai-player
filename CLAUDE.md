@@ -95,6 +95,7 @@ pipeline.py (post-session analysis)
 | `config/strategies/` | Genre-specific strategy configs (rpg, action, sports, puzzle, themepark) |
 | `tests/` | pytest suite (301 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
+| `DOCS/STRATEGY_GUIDE.md` | Genre-specific memory address + strategy config setup guide |
 | `pyproject.toml` | Project metadata + pytest configuration |
 
 ## Dev Commands
