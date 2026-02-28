@@ -5,6 +5,24 @@
 
 ---
 
+## 目次
+
+1. [前提条件](#前提条件)
+2. [クイックスタート（実ゲームE2E）](#クイックスタート実ゲームe2e)
+3. [ステップ1: Xvfb（仮想ディスプレイ）](#ステップ1-xvfb仮想ディスプレイ)
+4. [ステップ2: DuckStation](#ステップ2-duckstation)
+5. [ステップ3: メモリアドレス探索](#ステップ3-メモリアドレス探索)
+6. [ステップ4: memory_logger](#ステップ4-memory_logger)
+7. [ステップ5: ai_agent](#ステップ5-ai_agent)
+8. [ステップ6: pipeline（自動分析）](#ステップ6-pipeline自動分析)
+9. [全フローを一括で実行](#全フローを一括で実行)
+10. [ジャンル別E2Eワークフロー](#ジャンル別e2eワークフロー)
+11. [GPT-4o APIコスト見積](#gpt-4o-apiコスト見積)
+12. [E2E検証チェックリスト](#e2e検証チェックリスト)
+13. [トラブルシューティングチェックリスト](#トラブルシューティングチェックリスト)
+
+---
+
 ## 前提条件
 
 以下が完了していること:
@@ -24,13 +42,91 @@ ls -l ~/.config/duckstation/bios/
 ls ~/ps1-ai-player/isos/
 # game.iso 等が存在すること
 
-# アドレス定義（memory_loggerに必要）
-python address_manager.py --game SLPM-86023 --list
-# パラメータが1つ以上登録されていること
-
 # OpenAI APIキー
 echo "$OPENAI_API_KEY"
 # sk-... が出力されること
+```
+
+### 事前チェックの自動実行
+
+```bash
+source venv/bin/activate
+
+# 全項目を一括チェック（修正ヒント付き）
+python preflight_check.py --verbose --fix
+
+# 期待出力:
+# === PS1 AI Player Pre-flight Check ===
+#
+#   [OK]  ISO file: Found 1 ISO file(s) in isos
+#   [OK]  BIOS file: Found 1 BIOS file(s)
+#   [OK]  DuckStation: DuckStation found: duckstation/DuckStation.AppImage
+#   [OK]  Python venv: venv Python found: venv/bin/python
+#   [OK]  OpenAI API key: OPENAI_API_KEY is set in environment
+#
+# Result: 5/5 checks passed.
+# All checks passed. Ready for E2E session!
+```
+
+いずれかが `[FAIL]` の場合、`--fix` で表示されるヒントに従って修正する。
+
+---
+
+## クイックスタート（実ゲームE2E）
+
+初めて実ゲームでテストする場合の最短手順。RPGを例にする。
+
+```bash
+source venv/bin/activate
+
+# --- Phase 1: 準備 ---
+
+# 1. preflightで全項目パス確認
+python preflight_check.py --fix
+
+# 2. Xvfb + DuckStation起動
+Xvfb :99 -screen 0 1280x1024x24 &
+export DISPLAY=:99
+./duckstation/DuckStation.AppImage -- isos/game.iso &
+sleep 5
+
+# --- Phase 2: メモリアドレス探索 ---
+
+# 3. メモリスキャナーで主要パラメータのアドレスを発見
+#    （詳細は「ステップ3: メモリアドレス探索」を参照）
+sudo python memory_scanner.py
+
+# 4. 発見したアドレスを登録
+python address_manager.py --game SLPM-86023 --add hp 0x0C1A28 int16 "Player HP"
+python address_manager.py --game SLPM-86023 --add mp 0x0C1A2A int16 "Player MP"
+python address_manager.py --game SLPM-86023 --add gold 0x0C1B40 int32 "Gold"
+# ... 他のパラメータも同様
+
+# 5. 登録確認
+python address_manager.py --game SLPM-86023 --list
+
+# --- Phase 3: 短時間テスト実行 ---
+
+# 6. DuckStationを一旦停止して run.sh で統合起動（5分テスト）
+pkill -f DuckStation
+pkill -f 'Xvfb :99'
+
+./run.sh \
+    --game SLPM-86023 \
+    --iso isos/game.iso \
+    --strategy balanced \
+    --duration 300 \
+    --detail low \
+    --interval 5.0
+
+# --- Phase 4: 結果確認 ---
+
+# 7. 出力確認
+ls -la logs/*SLPM-86023*.csv          # メモリログCSV
+ls -la logs/*.session.json            # セッション情報（コスト等）
+ls -la reports/GDD_SLPM-86023_*.md    # GDD
+ls -la reports/causal_chains_*.json   # 因果チェーン
+ls -la reports/*.png                  # 可視化チャート
 ```
 
 ---
@@ -133,6 +229,22 @@ cat ~/.config/duckstation/settings.ini | grep -E '(SearchDirectory|PatchFastBoot
 # [Controller1] Type = DigitalController
 ```
 
+### GPU設定のヘッドレス最適化
+
+Xvfb環境ではOpenGLがソフトウェアレンダリングになるため、GPU設定の調整が必要な場合がある:
+
+```bash
+# settings.ini を手動修正する場合
+# [GPU]
+# Renderer = Software          ← Xvfbで最も安定
+# ResolutionScale = 1          ← ソフトウェアレンダラーは1固定
+# TrueColor = false
+
+# または setup_duckstation.py を再実行
+python setup_duckstation.py
+# その後 settings.ini の [GPU] Renderer を Software に手動変更
+```
+
 ### よくあるエラー
 
 | エラー | 原因 | 対処 |
@@ -146,7 +258,128 @@ cat ~/.config/duckstation/settings.ini | grep -E '(SearchDirectory|PatchFastBoot
 
 ---
 
-## ステップ3: memory_logger
+## ステップ3: メモリアドレス探索
+
+### 何をするか
+
+ゲーム内パラメータ（HP、所持金、スコア等）が格納されているメモリアドレスを特定する。
+これがE2Eテストの**最も重要な準備ステップ**であり、ゲームごとに必ず実施する必要がある。
+
+> 詳細なジャンル別アドレス設定については `DOCS/STRATEGY_GUIDE.md` を参照。
+
+### 基本的なスキャン手順
+
+```bash
+# 前提: DuckStationでゲームが起動中であること
+# メモリスキャナーは /proc/PID/mem を読むため sudo が必要（他ユーザー起動の場合）
+# 同一ユーザーなら sudo 不要
+
+source venv/bin/activate
+sudo python memory_scanner.py
+```
+
+### スキャンの流れ（例: RPGのHP探索）
+
+```
+# --- ステップ1: 初回スキャン ---
+# ゲーム画面でHP = 500と表示されている状態で:
+
+> scan 500 int16
+Found 1247 candidate addresses
+
+# --- ステップ2: ゲーム内で値を変化させる ---
+# 敵から攻撃を受けてHP = 472に変化
+
+> filter 472 int16
+Found 12 candidate addresses
+
+# --- ステップ3: さらに変化させてフィルタ ---
+# ポーションを使ってHP = 500に回復
+
+> filter 500 int16
+Found 2 candidate addresses
+  0x000C1A28: 500
+  0x000F2100: 500
+
+# --- ステップ4: どちらが正しいか確認 ---
+# もう一度ダメージを受けてHP = 465
+
+> filter 465 int16
+Found 1 address:
+  0x000C1A28: 465    ← これがHP
+
+# --- ステップ5: アドレスを保存 ---
+> save hp 0x000C1A28 int16
+
+# セッション内アドレスのエクスポート
+> export SLPM-86023
+Exported 1 addresses for SLPM-86023
+```
+
+### データ型の選び方
+
+| パラメータ | よく使われる型 | 根拠 |
+|-----------|--------------|------|
+| HP / MP | `int16` (0-65535) | PS1ゲームの大半は16bit整数 |
+| 所持金 / スコア | `int32` (0-2147483647) | 大きな数値を扱う場合 |
+| レベル / ステージ | `int8` (0-255) | 小さな値の場合 |
+| 座標 / 速度 | `float32` | 小数値。toleranceオプション使用推奨 |
+| フラグ（ON/OFF） | `int8` | 0 or 1 |
+
+### float32のスキャン（座標など）
+
+```
+# float値はtolerance付きスキャン
+> scan 100.5 float32 --tolerance 0.1
+Found 342 addresses
+
+# 値を変化させてフィルタ
+> filter 102.3 float32 --tolerance 0.1
+Found 8 addresses
+```
+
+### 複数パラメータの一括登録
+
+```bash
+# 対話セッションで複数パラメータを発見した後、一括登録
+python address_manager.py --game SLPM-86023 --add hp 0x0C1A28 int16 "Player HP"
+python address_manager.py --game SLPM-86023 --add mp 0x0C1A2A int16 "Player MP"
+python address_manager.py --game SLPM-86023 --add gold 0x0C1B40 int32 "Gold"
+python address_manager.py --game SLPM-86023 --add level 0x0C1A2C int8 "Player Level"
+
+# または JSON/CSVからバッチインポート
+python address_manager.py --game SLPM-86023 --import addresses.json
+python address_manager.py --game SLPM-86023 --import addresses.csv
+
+# 登録確認
+python address_manager.py --game SLPM-86023 --list
+```
+
+### アドレス登録JSON形式の例
+
+```json
+{
+  "game_id": "SLPM-86023",
+  "addresses": [
+    {"name": "hp",    "address": "0x0C1A28", "type": "int16", "description": "Player HP"},
+    {"name": "mp",    "address": "0x0C1A2A", "type": "int16", "description": "Player MP"},
+    {"name": "gold",  "address": "0x0C1B40", "type": "int32", "description": "Gold"},
+    {"name": "level", "address": "0x0C1A2C", "type": "int8",  "description": "Player Level"}
+  ]
+}
+```
+
+### スキャンのコツ
+
+- **まず変化しやすいパラメータから**: HP（戦闘でダメージ）、金（買い物/戦闘報酬）が最も見つけやすい
+- **画面表示と完全一致する値を探す**: 内部値と表示値が異なるゲームもある（例: 内部x10）
+- **3回以上フィルタする**: 2回だと偶然一致が残りやすい
+- **ゲーム再起動後はスキャンをやり直す**: メモリレイアウトが変わることがある
+- **最低3パラメータは登録する**: 因果分析に意味のある相関を出すには3つ以上のパラメータが必要
+
+---
+
+## ステップ4: memory_logger
 
 ### 何をするか
 
@@ -161,7 +394,7 @@ DuckStationの `/proc/PID/mem` を直接読む。
 # アドレスが登録されているか
 source venv/bin/activate
 python address_manager.py --game SLPM-86023 --list
-# name: money, address: 0x1F800000, type: int32 のような出力
+# name: hp, address: 0x0C1A28, type: int16 のような出力
 
 # DuckStationのPID自動検出テスト
 python -c "
@@ -176,14 +409,33 @@ if pid:
 
 # memory_loggerを単体起動（5秒間隔でポーリング、Ctrl+Cで停止）
 python memory_logger.py --game SLPM-86023 --interval 5.0
-# [1] money=1000 | satisfaction=75 のような出力が出ること
+# [1] hp=500 | mp=120 | gold=3000 のような出力が出ること
 # logs/ にCSVファイルが作成されること
 
 # ログファイル確認
 ls -lt ~/ps1-ai-player/logs/
 # 最新のCSVファイルが存在すること
 head -3 ~/ps1-ai-player/logs/*_SLPM-86023*.csv
-# timestamp,frame,money,satisfaction,... のようなヘッダ+データ行
+# timestamp,frame,gold,hp,mp,... のようなヘッダ+データ行（アルファベット順）
+```
+
+### ログCSVの検証ポイント
+
+```bash
+# 1. カラム名がアルファベット順か
+head -1 logs/*_SLPM-86023*.csv
+# timestamp,frame,gold,hp,level,mp  ← sorted
+
+# 2. 値が変動しているか（全行同一値ならアドレスが間違い or ゲームが停止中）
+awk -F, 'NR>1 {print $3}' logs/*_SLPM-86023*.csv | sort -u | wc -l
+# 2以上なら値が変動している
+
+# 3. -1が大量にないか（-1 = 読み取り失敗）
+grep -c '\-1' logs/*_SLPM-86023*.csv
+# 全行数に対して10%以下が望ましい
+
+# 4. データ行数（100行以上で因果分析が有効に動く）
+wc -l logs/*_SLPM-86023*.csv
 ```
 
 ### よくあるエラー
@@ -196,31 +448,9 @@ head -3 ~/ps1-ai-player/logs/*_SLPM-86023*.csv
 | `Could not read XXX at 0x...: OSError` | base_offset計算ミス or ゲームがロード完了前 | ゲームがメインメニューまで到達してから再試行。`memory_scanner.py` でインタラクティブに確認 |
 | CSVに全て `-1` が記録される | アドレスが間違っている | `memory_scanner.py` で対話的にスキャンし直す |
 
-### メモリスキャンの事前準備
-
-memory_loggerを使うには、ゲーム固有のアドレスを事前に発見しておく必要がある:
-
-```bash
-# DuckStationを起動した状態で
-sudo python memory_scanner.py
-
-# 対話セッション例:
-#   > scan 1000 int32        （所持金が1000のとき）
-#   Found 847 addresses
-#   > （ゲーム内で金額を変更）
-#   > filter 950 int32       （金額が950に変わった）
-#   Found 3 addresses
-#   > filter 900 int32       （さらに変更）
-#   Found 1 address: 0x1A3400
-#   > save money 0x1A3400 int32
-
-# 発見したアドレスを登録
-python address_manager.py --game SLPM-86023 --add money 0x1A3400 int32 "Player money"
-```
-
 ---
 
-## ステップ4: ai_agent
+## ステップ5: ai_agent
 
 ### 何をするか
 
@@ -278,6 +508,55 @@ ls -lt ~/ps1-ai-player/logs/*.session.json 2>/dev/null | head -3
 # .session.jsonにコスト情報が記録されていること
 ```
 
+### エージェント出力の検証ポイント
+
+```bash
+# 1. session.json でAPIコストとステップ数を確認
+python -m json.tool logs/*.session.json | head -20
+
+# 期待される内容:
+# {
+#   "game_id": "SLPM-86023",
+#   "steps": 12,
+#   "cost": {
+#     "prompt_tokens": 15400,
+#     "completion_tokens": 2300,
+#     "total_cost_usd": 0.052
+#   },
+#   "game_states": {"gameplay": 8, "menu": 2, "dialog": 2},
+#   "strategy_switches": [...]
+# }
+
+# 2. ゲーム状態がgameplay以外も検出されているか
+#    (menu/dialog/loadingが適切に分類されているかの確認)
+
+# 3. 戦略切り替えが発生しているか
+#    (パラメータ閾値に基づくstrategy switchがログに記録される)
+```
+
+### 戦略設定の選択
+
+ゲームジャンルに合わせた戦略設定ファイルを使用する:
+
+```bash
+# ジャンルプリセットを使用（推奨）
+python ai_agent.py --game SLPM-86023 --strategy-config config/strategies/rpg.json
+
+# または自動検出（from_genre）
+# AIAgent内部でfrom_genre("rpg")が呼ばれる
+
+# カスタム設定ファイルを作成して使用
+python ai_agent.py --game SLPM-86023 --strategy-config my_custom_strategy.json
+```
+
+| ジャンル | 設定ファイル | 主要閾値 |
+|---------|-------------|---------|
+| RPG | `config/strategies/rpg.json` | hp < 30% → defensive, mp < 20% → conservation |
+| Action | `config/strategies/action.json` | lives <= 1 → cautious, hp < 25% → defensive |
+| Sports | `config/strategies/sports.json` | score_diff < -2 → aggressive, stamina < 20 → conservation |
+| Puzzle | `config/strategies/puzzle.json` | stack_height > 80 → emergency_clear |
+| ThemePark | `config/strategies/themepark.json` | money < 500 → cost_reduction |
+
 ### よくあるエラー
 
 | エラー | 原因 | 対処 |
@@ -292,19 +571,9 @@ ls -lt ~/ps1-ai-player/logs/*.session.json 2>/dev/null | head -3
 | GPT-4o の応答が空/不正JSON | prompt が不適切 or ゲーム画面が認識不能 | `--detail high` に変更。`--lang ja` でゲーム言語を指定 |
 | `Consecutive screenshot errors, stopping` | 3回連続でスクリーンキャプチャ失敗 | Xvfb/DuckStationの生存確認。`kill -0 PID` でプロセス確認 |
 
-### 戦略の選択基準
-
-| 戦略 | 用途 |
-|------|------|
-| `balanced` | デフォルト。パラメータ閾値に応じて自動切替 |
-| `exploration` | ゲーム序盤。マップ探索、未知のアクション試行を優先 |
-| `expansion` | 資金に余裕があるとき。施設建設等を優先 |
-| `satisfaction` | 顧客満足度が低下しているとき |
-| `cost_reduction` | 資金不足時。コスト削減を優先 |
-
 ---
 
-## ステップ5: pipeline（自動分析）
+## ステップ6: pipeline（自動分析）
 
 ### 何をするか
 
@@ -348,6 +617,31 @@ ls ~/ps1-ai-player/reports/*.png
 # correlation_heatmap.png, time_series.png, lag_correlations.png, causal_graph.png
 ```
 
+### パイプライン出力の検証ポイント
+
+```bash
+# 1. 因果チェーンが検出されているか
+python -c "
+import json
+with open('$(ls -t reports/causal_chains_*.json | head -1)') as f:
+    chains = json.load(f)
+print(f'因果チェーン数: {len(chains)}')
+for c in chains[:5]:
+    print(f'  {c[\"source\"]} -> {c[\"target\"]}: r={c[\"correlation\"]:.3f}, lag={c[\"lag\"]}')
+"
+
+# 2. GDDにフィードバックループが記載されているか
+grep -A3 'Feedback Loop' reports/GDD_SLPM-86023_*.md
+
+# 3. GDDのJSON出力も生成（構造化データが欲しい場合）
+python gdd_generator.py \
+    --csv logs/*_SLPM-86023*.csv \
+    --game SLPM-86023 \
+    --local \
+    --format both
+# reports/ に .md と .json の両方が生成される
+```
+
 ### サンプルデータで事前検証
 
 実ゲームのデータがなくても、サンプルデータでパイプラインの動作を確認できる:
@@ -355,12 +649,14 @@ ls ~/ps1-ai-player/reports/*.png
 ```bash
 source venv/bin/activate
 
-# サンプルデータ生成
-python sample_data/generate_sample.py
+# ジャンル別デモ（API key不要）
+python demo_run.py --genre rpg
+python demo_run.py --genre action
+python demo_run.py --genre themepark
 
-# パイプライン実行
+# サンプルデータで手動パイプライン実行
 python pipeline.py \
-    --logs sample_data/sample_log.csv \
+    --logs sample_data/rpg_sample_log.csv \
     --game DEMO \
     --skip-sim
 
@@ -423,6 +719,165 @@ tail -f ~/ps1-ai-player/logs/*_SLPM-86023*.csv
 cat ~/ps1-ai-player/logs/*.session.json 2>/dev/null | python -m json.tool | grep -A5 cost
 ```
 
+### 推奨テスト実行パターン
+
+| 段階 | duration | interval | detail | 目的 |
+|------|----------|----------|--------|------|
+| 動作確認 | 60 | 5.0 | low | 各コンポーネントが起動するか確認 |
+| 短時間テスト | 300 | 5.0 | low | メモリログ + AI操作が記録されるか確認 |
+| 因果分析テスト | 1800 | 3.0 | low | 100行以上のデータで因果チェーン検出を確認 |
+| 本番セッション | 3600+ | 3.0 | low | 完全なGDD生成 |
+| 高品質分析 | 3600+ | 5.0 | high | GPT-4o detail=highでの精密分析（コスト増） |
+
+---
+
+## ジャンル別E2Eワークフロー
+
+### RPG（例: FF7, ドラクエ）
+
+```bash
+# 1. 推奨メモリパラメータ: hp, mp, gold, level, exp, enemy_strength
+# 2. 戦略設定
+python ai_agent.py --game SLPS-01057 \
+    --strategy-config config/strategies/rpg.json \
+    --lang ja --detail low --interval 3.0
+
+# 3. スキャンのコツ
+#    - HPはバトル中に変化するのでバトルに入ってからスキャン
+#    - 所持金は店で買い物して変化させる
+#    - 経験値はバトル勝利で増加
+#    - レベルは経験値がたまるまで変化しないので最後に確認
+
+# 4. 期待される因果チェーン
+#    enemy_strength → hp (lag 2-5): 敵の強さがHPに影響
+#    hp → action (lag 1): HP低下が回復行動を誘発
+#    exp → level (lag 1): 経験値蓄積によるレベルアップ
+```
+
+### アクション（例: クラッシュ・バンディクー, ロックマン）
+
+```bash
+# 1. 推奨メモリパラメータ: lives, hp, score, time_remaining, speed
+# 2. 戦略設定
+python ai_agent.py --game SCPS-10031 \
+    --strategy-config config/strategies/action.json \
+    --lang ja --detail low --interval 2.0
+
+# 3. スキャンのコツ
+#    - 残機はミスして変化させる
+#    - スコアは敵撃破やアイテムで増加
+#    - タイマーは時間経過で自然に変化するため探しやすい
+
+# 4. 期待される因果チェーン
+#    speed → hp (lag 1-3): スピード上昇が被ダメージに影響
+#    time_remaining → speed (lag 2): 残り時間がスピード変化を誘発
+#    lives → play_style (lag 1): 残機減少が慎重なプレイを誘発
+```
+
+### テーマパーク経営（例: テーマパーク, シムシティ）
+
+```bash
+# 1. 推奨メモリパラメータ: money, satisfaction, visitors, nausea, hunger
+# 2. 戦略設定
+python ai_agent.py --game SLPS-00228 \
+    --strategy-config config/strategies/themepark.json \
+    --lang ja --detail low --interval 5.0
+
+# 3. スキャンのコツ
+#    - 所持金はゲーム時間経過で変動するため待つだけでOK
+#    - 満足度は数値表示がない場合、パーセンテージ推定が必要
+#    - 来場者数は画面UIの数字をそのままスキャン
+```
+
+---
+
+## GPT-4o APIコスト見積
+
+### コスト計算式
+
+```
+1ステップあたりのコスト（detail=low）:
+  入力: ~800 tokens (system prompt + screenshot 85 tokens + memory data)
+  出力: ~200 tokens (action JSON)
+  コスト: (800 * $2.50 + 200 * $10.00) / 1M = $0.004/step
+
+1ステップあたりのコスト（detail=high）:
+  入力: ~1700 tokens (screenshot 765 tokens at high detail)
+  出力: ~200 tokens
+  コスト: (1700 * $2.50 + 200 * $10.00) / 1M = $0.006/step
+```
+
+### セッション別コスト目安
+
+| セッション | duration | interval | steps | detail=low | detail=high |
+|-----------|----------|----------|-------|-----------|------------|
+| 動作確認 | 60s | 5s | ~12 | ~$0.05 | ~$0.07 |
+| 短時間テスト | 300s | 5s | ~60 | ~$0.24 | ~$0.36 |
+| 因果分析テスト | 1800s | 3s | ~600 | ~$2.40 | ~$3.60 |
+| 本番（1時間） | 3600s | 3s | ~1200 | ~$4.80 | ~$7.20 |
+| 長時間（2時間） | 7200s | 3s | ~2400 | ~$9.60 | ~$14.40 |
+
+### コスト削減の方法
+
+- `--detail low` を使用（デフォルト）: スクリーンショットのトークン数が1/9に
+- `--interval` を大きくする: 5秒→10秒で半額
+- 因果分析のみ行う場合: memory_loggerだけ動かし、ai_agentは手動操作（APIコスト = $0）
+
+```bash
+# コスト0でデータ収集 → 分析のみ実行
+python memory_logger.py --game SLPM-86023 --interval 2.0
+# (手動でゲームをプレイ。Ctrl+Cで停止)
+
+python pipeline.py --logs logs/*_SLPM-86023*.csv --game SLPM-86023 --skip-sim
+# → 因果チェーン + GDD 生成（APIコスト: $0）
+```
+
+---
+
+## E2E検証チェックリスト
+
+実ゲームでのE2Eテスト後、以下を確認する:
+
+### Phase 1: 基盤動作
+
+- [ ] `preflight_check.py --verbose --fix` が 5/5 パス
+- [ ] Xvfbが起動し `xdpyinfo` が応答する
+- [ ] DuckStationがISOをロードし、ゲーム画面が表示される
+- [ ] `pgrep -a -i duckstation` でPIDが取得できる
+- [ ] `/proc/PID/maps` が読める
+
+### Phase 2: メモリアクセス
+
+- [ ] `memory_scanner.py` でDuckStationのPS1 RAMが検出される
+- [ ] 最低3つのパラメータのアドレスを発見・登録済み
+- [ ] `address_manager.py --list` で登録内容を確認
+- [ ] `memory_logger.py` で値がCSVに記録される
+- [ ] CSV内の値が -1 ばかりでなく、ゲーム内の変化と一致する
+
+### Phase 3: AIエージェント
+
+- [ ] スクリーンキャプチャがDuckStationの画面を正しく取得（黒い画像でない）
+- [ ] GPT-4o Visionが画面を認識し、有効なJSON応答を返す
+- [ ] pynputのキー入力がDuckStationに届く（ゲーム内でキャラが動く等）
+- [ ] `GameStateTracker` がgameplay/menu/dialogを区別している
+- [ ] `AdaptiveStrategyEngine` がパラメータ変化に応じて戦略を切り替えている
+- [ ] `.session.json` にコスト情報が記録されている
+
+### Phase 4: 分析パイプライン
+
+- [ ] CSVログが100行以上ある
+- [ ] `data_analyzer.py` が1つ以上の因果チェーンを検出
+- [ ] `gdd_generator.py` がGDD markdown/JSONを生成
+- [ ] GDD内にフィードバックループの分析が含まれている
+- [ ] `visualizer.py` が4つのPNGチャートを生成
+- [ ] 因果チェーンの内容がゲームの仕組みと整合する
+
+### Phase 5: 統合
+
+- [ ] `run.sh` で全ステップが自動的に順序通り実行される
+- [ ] Ctrl+Cで全プロセスが正常停止する
+- [ ] `reports/` に最終成果物（GDD + チャート + 因果チェーンJSON）が揃っている
+
 ---
 
 ## トラブルシューティングチェックリスト
@@ -456,6 +911,11 @@ python address_manager.py --game SLPM-86023 --list 2>/dev/null || echo "No addre
 
 # 7. ディスク容量
 df -h ~/ps1-ai-player/
+
+# 8. ネットワーク（API接続）
+curl -s -o /dev/null -w "%{http_code}" https://api.openai.com/v1/models \
+    -H "Authorization: Bearer $OPENAI_API_KEY"
+# 200ならOK
 ```
 
 ### プロセスの手動停止
@@ -472,4 +932,16 @@ pkill -f pipeline
 
 # ロックファイル削除
 rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
+```
+
+### ログ・レポートのクリーンアップ
+
+```bash
+# 古いログを削除（7日以上前）
+find logs/ -name "*.csv" -mtime +7 -delete
+find logs/ -name "*.session.json" -mtime +7 -delete
+
+# レポートを削除して再生成
+rm -f reports/*.png reports/*.md reports/*.json
+python pipeline.py --logs logs/*_SLPM-86023*.csv --game SLPM-86023 --skip-sim
 ```
