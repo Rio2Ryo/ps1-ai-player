@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Session tag/label system for PS1 AI Player.
+"""Session tag/label and notes system for PS1 AI Player.
 
-Manages user-defined tags (e.g. "good_run", "boss_fight", "failed") for
-sessions.  Tags are persisted in a single JSON file alongside session CSVs,
-making them portable and easy to filter in the dashboard or cross-session
-analysis.
+Manages user-defined tags (e.g. "good_run", "boss_fight", "failed") and
+free-text notes for sessions.  Tags are persisted in ``session_tags.json``,
+notes in ``session_notes.json``, both alongside session CSVs.
 
 Usage:
     python session_tagger.py tag <csv_filename> <tag1> [tag2 ...]
     python session_tagger.py untag <csv_filename> <tag1> [tag2 ...]
     python session_tagger.py list-tags [--log-dir logs/]
     python session_tagger.py show <csv_filename> [--log-dir logs/]
+    python session_tagger.py note <csv_filename> <text>
+    python session_tagger.py show-note <csv_filename> [--log-dir logs/]
+    python session_tagger.py delete-note <csv_filename> [--log-dir logs/]
 """
 from __future__ import annotations
 
@@ -109,6 +111,61 @@ class SessionTagger:
             tags.update(tag_list)
         return sorted(tags)
 
+    # -- Notes ---------------------------------------------------------------
+
+    @property
+    def _notes_path(self) -> Path:
+        """Return the path to the session notes JSON file."""
+        return self.log_dir / "session_notes.json"
+
+    def _load_notes(self) -> dict[str, str]:
+        """Load notes JSON.  Returns empty dict if file is missing."""
+        if not self._notes_path.exists():
+            return {}
+        try:
+            data = json.loads(self._notes_path.read_text())
+            if not isinstance(data, dict):
+                return {}
+            return data
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _save_notes(self, data: dict[str, str]) -> None:
+        """Write notes JSON."""
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self._notes_path.write_text(json.dumps(data, indent=2) + "\n")
+
+    def set_note(self, csv_filename: str, text: str) -> str:
+        """Set (or replace) the note for a session.  Returns the saved text.
+
+        Leading/trailing whitespace is stripped.  Empty text deletes the note.
+        """
+        text = text.strip()
+        data = self._load_notes()
+        if text:
+            data[csv_filename] = text
+        else:
+            data.pop(csv_filename, None)
+        self._save_notes(data)
+        logger.debug("Note set for %s: %s", csv_filename, text[:50] if text else "(deleted)")
+        return text
+
+    def get_note(self, csv_filename: str) -> str:
+        """Get the note for a session.  Returns empty string if none."""
+        return self._load_notes().get(csv_filename, "")
+
+    def delete_note(self, csv_filename: str) -> None:
+        """Delete the note for a session."""
+        data = self._load_notes()
+        if csv_filename in data:
+            del data[csv_filename]
+            self._save_notes(data)
+            logger.debug("Note deleted for %s", csv_filename)
+
+    def list_notes(self) -> dict[str, str]:
+        """Return all session -> note mappings."""
+        return self._load_notes()
+
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -139,6 +196,19 @@ def main() -> None:
     show_p = sub.add_parser("show", help="Show tags for a specific session")
     show_p.add_argument("csv_filename", help="CSV filename (not full path)")
 
+    # note
+    note_p = sub.add_parser("note", help="Set a note for a session")
+    note_p.add_argument("csv_filename", help="CSV filename (not full path)")
+    note_p.add_argument("text", nargs="+", help="Note text")
+
+    # show-note
+    show_note_p = sub.add_parser("show-note", help="Show note for a session")
+    show_note_p.add_argument("csv_filename", help="CSV filename (not full path)")
+
+    # delete-note
+    del_note_p = sub.add_parser("delete-note", help="Delete note for a session")
+    del_note_p.add_argument("csv_filename", help="CSV filename (not full path)")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -166,6 +236,22 @@ def main() -> None:
     elif args.command == "show":
         tags = tagger.get_tags(args.csv_filename)
         print(f"{args.csv_filename}: {tags}")
+
+    elif args.command == "note":
+        text = " ".join(args.text)
+        result = tagger.set_note(args.csv_filename, text)
+        print(f"{args.csv_filename} note: {result}")
+
+    elif args.command == "show-note":
+        note = tagger.get_note(args.csv_filename)
+        if note:
+            print(f"{args.csv_filename} note: {note}")
+        else:
+            print(f"{args.csv_filename}: no note")
+
+    elif args.command == "delete-note":
+        tagger.delete_note(args.csv_filename)
+        print(f"{args.csv_filename}: note deleted")
 
 
 if __name__ == "__main__":

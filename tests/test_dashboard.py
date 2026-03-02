@@ -1019,3 +1019,62 @@ class TestNotifierPage:
         """POST /api/notifier/test with no config returns 404."""
         resp = client.post("/api/notifier/test")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# TestSessionNotes
+# ---------------------------------------------------------------------------
+
+class TestSessionNotesDashboard:
+    def test_session_detail_shows_note_form(self, client, session_csv):
+        """Session detail page contains a note textarea."""
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        assert "Session Note" in resp.text
+        assert "textarea" in resp.text
+
+    def test_api_get_notes_empty(self, client, session_csv):
+        """GET /api/session/{name}/notes returns empty note."""
+        resp = client.get(f"/api/session/{session_csv.name}/notes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["note"] == ""
+
+    def test_api_post_notes_json(self, client, session_csv):
+        """POST /api/session/{name}/notes sets note via JSON."""
+        resp = client.post(
+            f"/api/session/{session_csv.name}/notes",
+            json={"note": "Boss defeated at step 42"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["note"] == "Boss defeated at step 42"
+
+        # Verify it persists via GET
+        resp2 = client.get(f"/api/session/{session_csv.name}/notes")
+        assert resp2.json()["note"] == "Boss defeated at step 42"
+
+    def test_api_post_empty_note_deletes(self, client, session_csv):
+        """POST with empty note string deletes the note."""
+        # Set a note first
+        client.post(
+            f"/api/session/{session_csv.name}/notes",
+            json={"note": "to delete"},
+        )
+        # Delete it
+        resp = client.post(
+            f"/api/session/{session_csv.name}/notes",
+            json={"note": ""},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["note"] == ""
+
+    def test_session_detail_shows_saved_note(self, client, session_csv):
+        """Session detail page displays the saved note text."""
+        client.post(
+            f"/api/session/{session_csv.name}/notes",
+            json={"note": "Important observation here"},
+        )
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        assert "Important observation here" in resp.text

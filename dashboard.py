@@ -376,6 +376,23 @@ async def session_detail(csv_filename: str):
         body += ' <button class="btn" type="submit" style="background:#e53935;">Remove Tags</button></form>'
     body += "</div>"
 
+    # Session note
+    note = tagger.get_note(csv_filename)
+    body += '<div class="card"><h3>Session Note</h3>'
+    if note:
+        body += f"<p>{note}</p>"
+    else:
+        body += "<p><em>No note set.</em></p>"
+    body += f'<form method="post" action="/api/session/{csv_filename}/notes">'
+    body += '<textarea name="note" rows="3" style="padding:6px;width:100%;box-sizing:border-box;" '
+    body += f'placeholder="Add a note about this session...">{note}</textarea>'
+    body += ' <button class="btn" type="submit" style="margin-top:6px;">Save Note</button></form>'
+    if note:
+        body += f'<form method="post" action="/api/session/{csv_filename}/notes" style="margin-top:6px;">'
+        body += '<input type="hidden" name="note" value="">'
+        body += '<button class="btn" type="submit" style="background:#e53935;">Delete Note</button></form>'
+    body += "</div>"
+
     # Time-series chart (inline base64)
     if session.parameters:
         try:
@@ -1619,6 +1636,48 @@ async def api_post_tags(csv_filename: str, request: Request):
         return RedirectResponse(url=f"/session/{csv_filename}", status_code=303)
 
     return JSONResponse(content={"csv_filename": csv_filename, "tags": result})
+
+
+# ---------------------------------------------------------------------------
+# Routes: Session Notes API
+# ---------------------------------------------------------------------------
+
+@app.get("/api/session/{csv_filename}/notes")
+async def api_get_notes(csv_filename: str):
+    """JSON API: get note for a session."""
+    from session_tagger import SessionTagger
+
+    tagger = SessionTagger(log_dir=LOG_DIR)
+    note = tagger.get_note(csv_filename)
+    return JSONResponse(content={"csv_filename": csv_filename, "note": note})
+
+
+@app.post("/api/session/{csv_filename}/notes")
+async def api_post_notes(csv_filename: str, request: Request):
+    """Set or delete note for a session.
+
+    Accepts form data or JSON with ``note`` field.  Empty note deletes it.
+    Redirects to session detail when submitted from a browser form.
+    """
+    from session_tagger import SessionTagger
+
+    tagger = SessionTagger(log_dir=LOG_DIR)
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        body = await request.json()
+        note_text = body.get("note", "")
+    else:
+        form = await request.form()
+        note_text = form.get("note", "")
+
+    result = tagger.set_note(csv_filename, note_text)
+
+    if "application/json" not in content_type:
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url=f"/session/{csv_filename}", status_code=303)
+
+    return JSONResponse(content={"csv_filename": csv_filename, "note": result})
 
 
 # ---------------------------------------------------------------------------

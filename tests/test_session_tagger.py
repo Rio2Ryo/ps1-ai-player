@@ -102,6 +102,71 @@ class TestSessionTagger:
 
 
 # ---------------------------------------------------------------------------
+# TestSessionNotes
+# ---------------------------------------------------------------------------
+
+class TestSessionNotes:
+    def test_set_note(self, tagger):
+        result = tagger.set_note("session.csv", "This was a great run")
+        assert result == "This was a great run"
+
+    def test_get_note(self, tagger):
+        tagger.set_note("session.csv", "Boss fight at step 42")
+        assert tagger.get_note("session.csv") == "Boss fight at step 42"
+
+    def test_get_note_empty(self, tagger):
+        assert tagger.get_note("nonexistent.csv") == ""
+
+    def test_set_note_replaces(self, tagger):
+        tagger.set_note("session.csv", "First note")
+        tagger.set_note("session.csv", "Updated note")
+        assert tagger.get_note("session.csv") == "Updated note"
+
+    def test_set_note_strips_whitespace(self, tagger):
+        result = tagger.set_note("session.csv", "  trimmed  ")
+        assert result == "trimmed"
+
+    def test_set_empty_note_deletes(self, tagger):
+        tagger.set_note("session.csv", "some note")
+        tagger.set_note("session.csv", "")
+        assert tagger.get_note("session.csv") == ""
+        assert "session.csv" not in tagger.list_notes()
+
+    def test_delete_note(self, tagger):
+        tagger.set_note("session.csv", "a note")
+        tagger.delete_note("session.csv")
+        assert tagger.get_note("session.csv") == ""
+
+    def test_delete_note_nonexistent(self, tagger):
+        # Should not raise
+        tagger.delete_note("nonexistent.csv")
+
+    def test_list_notes(self, tagger):
+        tagger.set_note("a.csv", "note A")
+        tagger.set_note("b.csv", "note B")
+        data = tagger.list_notes()
+        assert data == {"a.csv": "note A", "b.csv": "note B"}
+
+    def test_notes_path(self, tagger):
+        expected = tagger.log_dir / "session_notes.json"
+        assert tagger._notes_path == expected
+
+    def test_notes_persistence(self, tagger):
+        tagger.set_note("session.csv", "persistent note")
+        tagger2 = SessionTagger(log_dir=tagger.log_dir)
+        assert tagger2.get_note("session.csv") == "persistent note"
+
+    def test_notes_independent_of_tags(self, tagger):
+        tagger.tag("session.csv", "good_run")
+        tagger.set_note("session.csv", "my note")
+        assert tagger.get_tags("session.csv") == ["good_run"]
+        assert tagger.get_note("session.csv") == "my note"
+        # Deleting tags doesn't affect notes
+        tagger.untag("session.csv", "good_run")
+        assert tagger.get_note("session.csv") == "my note"
+
+
+# ---------------------------------------------------------------------------
 # TestSessionTaggerCLI
 # ---------------------------------------------------------------------------
 
@@ -160,6 +225,34 @@ class TestSessionTaggerCLI:
         result = self._run_cli("show", "session.csv", log_dir=str(log_dir))
         assert result.returncode == 0
         assert "good_run" in result.stdout
+
+    def test_cli_note(self, tmp_path):
+        log_dir = tmp_path / "logs"
+        log_dir.mkdir()
+        result = self._run_cli("note", "session.csv", "Great", "boss", "fight",
+                               log_dir=str(log_dir))
+        assert result.returncode == 0
+        assert "Great boss fight" in result.stdout
+        notes_file = log_dir / "session_notes.json"
+        assert notes_file.exists()
+        data = json.loads(notes_file.read_text())
+        assert data["session.csv"] == "Great boss fight"
+
+    def test_cli_show_note(self, tmp_path):
+        log_dir = tmp_path / "logs"
+        log_dir.mkdir()
+        self._run_cli("note", "session.csv", "My note", log_dir=str(log_dir))
+        result = self._run_cli("show-note", "session.csv", log_dir=str(log_dir))
+        assert result.returncode == 0
+        assert "My note" in result.stdout
+
+    def test_cli_delete_note(self, tmp_path):
+        log_dir = tmp_path / "logs"
+        log_dir.mkdir()
+        self._run_cli("note", "session.csv", "to delete", log_dir=str(log_dir))
+        result = self._run_cli("delete-note", "session.csv", log_dir=str(log_dir))
+        assert result.returncode == 0
+        assert "deleted" in result.stdout
 
     def test_cli_no_command(self, tmp_path):
         log_dir = tmp_path / "logs"
