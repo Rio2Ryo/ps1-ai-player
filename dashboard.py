@@ -1798,6 +1798,112 @@ async def api_session_predict(csv_filename: str):
 
 
 # ---------------------------------------------------------------------------
+# Routes: Alert Notifier
+# ---------------------------------------------------------------------------
+
+def _notifier_config_path() -> Path:
+    """Default path for the notifier config file."""
+    return LOG_DIR / "alert_notifier.json"
+
+
+@app.get("/notifier", response_class=HTMLResponse)
+async def notifier_page():
+    """Alert notifier configuration and status page."""
+    from alert_notifier import AlertNotifier
+
+    body = "<h1>Alert Notifier</h1>"
+
+    config_path = _notifier_config_path()
+    if config_path.exists():
+        notifier = AlertNotifier.from_config_file(config_path)
+        body += '<div class="card"><h2>Webhook Configuration</h2>'
+        if notifier.webhooks:
+            body += "<table><tr><th>Name</th><th>Backend</th><th>Enabled</th>"
+            body += "<th>Min Severity</th><th>URL</th></tr>"
+            for w in notifier.webhooks:
+                name = w.name or "(unnamed)"
+                enabled_style = "color:green" if w.enabled else "color:red"
+                body += (
+                    f"<tr><td>{name}</td><td>{w.backend}</td>"
+                    f'<td style="{enabled_style}">{w.enabled}</td>'
+                    f"<td>{w.min_severity}</td>"
+                    f"<td><code>{w.url[:40]}...</code></td></tr>"
+                )
+            body += "</table>"
+        else:
+            body += "<p>No webhooks configured.</p>"
+        body += "</div>"
+    else:
+        body += '<div class="card"><p>No notifier config found at '
+        body += f"<code>{config_path}</code>.</p>"
+        body += "<p>Create a config file with webhook definitions. Example:</p>"
+        body += '<pre>{"webhooks": [{"backend": "slack", "url": "https://hooks.slack.com/...", '
+        body += '"enabled": true, "min_severity": "medium", "name": "my-slack"}]}</pre>'
+        body += "</div>"
+
+    # Test send form
+    body += '<div class="card"><h2>Test Notification</h2>'
+    body += '<form method="post" action="/api/notifier/test">'
+    body += '<button class="btn" type="submit">Send Test Alert</button>'
+    body += "</form></div>"
+
+    return _render("Alert Notifier", body)
+
+
+@app.get("/api/notifier/config")
+async def api_notifier_config_get():
+    """GET notifier webhook configuration."""
+    from alert_notifier import AlertNotifier
+
+    config_path = _notifier_config_path()
+    if not config_path.exists():
+        return JSONResponse(content={"webhooks": [], "configured": False})
+    notifier = AlertNotifier.from_config_file(config_path)
+    return JSONResponse(content={
+        "webhooks": [w.to_dict() for w in notifier.webhooks],
+        "configured": True,
+    })
+
+
+@app.post("/api/notifier/config")
+async def api_notifier_config_post(request: Request):
+    """POST to update notifier webhook configuration."""
+    from alert_notifier import AlertNotifier, WebhookConfig
+
+    body = await request.json()
+    webhooks_data = body.get("webhooks", [])
+    webhooks = [WebhookConfig.from_dict(w) for w in webhooks_data]
+    notifier = AlertNotifier(webhooks)
+    notifier.save_config(_notifier_config_path())
+    return JSONResponse(content={
+        "webhooks": [w.to_dict() for w in notifier.webhooks],
+        "saved": True,
+    })
+
+
+@app.post("/api/notifier/test")
+async def api_notifier_test():
+    """Send a test alert to all configured webhooks."""
+    from alert_notifier import AlertMessage, AlertNotifier
+    from datetime import datetime
+
+    config_path = _notifier_config_path()
+    if not config_path.exists():
+        raise HTTPException(status_code=404, detail="No notifier config found")
+
+    notifier = AlertNotifier.from_config_file(config_path)
+    test_alert = AlertMessage(
+        severity="low",
+        title="Test Alert",
+        description="Test notification from PS1 AI Player dashboard.",
+        source="test",
+        timestamp=datetime.now().isoformat(),
+    )
+    result = notifier.send_all([test_alert])
+    return JSONResponse(content=result)
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 

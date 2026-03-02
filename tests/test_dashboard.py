@@ -960,3 +960,62 @@ class TestPredictPage:
         assert resp.status_code == 200
         assert "Predict" in resp.text
         assert f"/session/{session_csv.name}/predict" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# TestNotifierPage
+# ---------------------------------------------------------------------------
+
+class TestNotifierPage:
+    def test_notifier_page_no_config(self, client):
+        """GET /notifier with no config shows setup instructions."""
+        resp = client.get("/notifier")
+        assert resp.status_code == 200
+        assert "Alert Notifier" in resp.text
+        assert "No notifier config" in resp.text
+
+    def test_notifier_page_with_config(self, client):
+        """GET /notifier with config shows webhook table."""
+        import json as _json
+        config = {"webhooks": [
+            {"backend": "slack", "url": "https://hooks.slack.com/test",
+             "enabled": True, "min_severity": "medium", "name": "test-slack"},
+        ]}
+        config_path = dashboard.LOG_DIR / "alert_notifier.json"
+        config_path.write_text(_json.dumps(config))
+        resp = client.get("/notifier")
+        assert resp.status_code == 200
+        assert "test-slack" in resp.text
+        assert "slack" in resp.text
+
+    def test_api_notifier_config_get_empty(self, client):
+        """GET /api/notifier/config with no config returns empty list."""
+        resp = client.get("/api/notifier/config")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["configured"] is False
+        assert data["webhooks"] == []
+
+    def test_api_notifier_config_post(self, client):
+        """POST /api/notifier/config saves webhook configuration."""
+        resp = client.post("/api/notifier/config", json={
+            "webhooks": [
+                {"backend": "discord", "url": "https://discord.com/test",
+                 "enabled": True, "min_severity": "high", "name": "my-discord"},
+            ],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["saved"] is True
+        assert len(data["webhooks"]) == 1
+
+        # Verify it persisted
+        resp2 = client.get("/api/notifier/config")
+        data2 = resp2.json()
+        assert data2["configured"] is True
+        assert data2["webhooks"][0]["backend"] == "discord"
+
+    def test_api_notifier_test_no_config(self, client):
+        """POST /api/notifier/test with no config returns 404."""
+        resp = client.post("/api/notifier/test")
+        assert resp.status_code == 404
