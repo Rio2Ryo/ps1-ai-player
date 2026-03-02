@@ -406,11 +406,12 @@ async def session_detail(csv_filename: str):
         trows += "<tr>" + "".join(f"<td>{row[c]}</td>" for c in cols) + "</tr>"
     body += f"<table><tr>{header}</tr>{trows}</table>"
 
-    # Links to replay / actions / export
+    # Links to replay / actions / predict / export
     body += '<h2>Actions &amp; Export</h2>'
     body += (
         f'<a class="btn" href="/session/{csv_filename}/replay">Step Replay</a> '
         f'<a class="btn" href="/session/{csv_filename}/actions">Action Analysis</a> '
+        f'<a class="btn" href="/session/{csv_filename}/predict">Predict</a> '
         f'<a class="btn" href="/session/{csv_filename}/export">Download ZIP</a>'
     )
 
@@ -1720,6 +1721,80 @@ async def api_optimize(request: Request):
         "diff": optimizer.diff(),
         "notes": optimized.get("_optimization_notes", []),
     })
+
+
+# ---------------------------------------------------------------------------
+# Routes: Parameter Prediction
+# ---------------------------------------------------------------------------
+
+@app.get("/session/{csv_filename}/predict", response_class=HTMLResponse)
+async def session_predict(csv_filename: str):
+    """Prediction page — per-parameter charts, regression summary, threshold table."""
+    from parameter_predictor import ParameterPredictor, plot_prediction
+
+    session = _load_session(csv_filename)
+    predictor = ParameterPredictor(session)
+
+    body = f"<h1>Parameter Predictions: {session.timestamp}</h1>"
+
+    # Regression summary
+    body += '<div class="card"><h2>Regression Summary</h2>'
+    body += "<table><tr><th>Parameter</th><th>Slope</th><th>Intercept</th>"
+    body += "<th>R&sup2;</th><th>Trend</th></tr>"
+    for param in session.parameters:
+        reg = predictor.linear_regression(param)
+        trend = "rising" if reg["slope"] > 0 else ("falling" if reg["slope"] < 0 else "flat")
+        color = "green" if trend == "rising" else ("red" if trend == "falling" else "gray")
+        body += (
+            f"<tr><td>{param}</td><td>{reg['slope']:.4f}</td>"
+            f"<td>{reg['intercept']:.4f}</td><td>{reg['r_squared']:.4f}</td>"
+            f'<td style="color:{color}">{trend}</td></tr>'
+        )
+    body += "</table></div>"
+
+    # Threshold predictions
+    thresholds = predictor.predict_all_thresholds()
+    body += '<div class="card"><h2>Threshold Predictions</h2>'
+    body += "<table><tr><th>Parameter</th><th>Threshold</th><th>Direction</th>"
+    body += "<th>Est. Step</th><th>Current</th><th>Slope</th></tr>"
+    for t in thresholds:
+        est = str(t["estimated_step"]) if t["estimated_step"] is not None else "N/A"
+        body += (
+            f"<tr><td>{t['parameter']}</td><td>{t['threshold']:.2f}</td>"
+            f"<td>{t['direction']}</td><td>{est}</td>"
+            f"<td>{t['current_value']:.2f}</td><td>{t['slope']:.4f}</td></tr>"
+        )
+    body += "</table></div>"
+
+    # Per-parameter prediction charts
+    if session.parameters:
+        body += '<div class="card"><h2>Prediction Charts</h2>'
+        for param in session.parameters:
+            try:
+                src = _chart_to_base64(
+                    plot_prediction, predictor, param, 20,
+                )
+                body += f'<h3>{param}</h3>'
+                body += f'<img class="chart" src="{src}" alt="Prediction: {param}">'
+            except Exception as exc:
+                body += f"<p>Chart error for {param}: {exc}</p>"
+        body += "</div>"
+
+    body += (
+        f'<p><a class="btn" href="/session/{csv_filename}">Back to Session</a></p>'
+    )
+
+    return _render(f"Predictions: {session.timestamp}", body)
+
+
+@app.get("/api/session/{csv_filename}/predict")
+async def api_session_predict(csv_filename: str):
+    """JSON API: parameter predictions for a session."""
+    from parameter_predictor import ParameterPredictor
+
+    session = _load_session(csv_filename)
+    predictor = ParameterPredictor(session)
+    return JSONResponse(content=predictor.to_dict())
 
 
 # ---------------------------------------------------------------------------

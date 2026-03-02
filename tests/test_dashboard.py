@@ -917,3 +917,46 @@ class TestSessionTags:
         data = resp.json()
         assert "good_run" in data["tags"]
         assert "boss_fight" not in data["tags"]
+
+
+# ---------------------------------------------------------------------------
+# TestPredictPage
+# ---------------------------------------------------------------------------
+
+class TestPredictPage:
+    def test_predict_page_returns_200(self, client, session_csv):
+        """GET /session/{name}/predict returns 200."""
+        resp = client.get(f"/session/{session_csv.name}/predict")
+        assert resp.status_code == 200
+
+    def test_predict_page_shows_charts(self, client, session_csv):
+        """Prediction page contains chart images."""
+        resp = client.get(f"/session/{session_csv.name}/predict")
+        assert resp.status_code == 200
+        assert "data:image/png;base64," in resp.text
+        assert "Prediction Charts" in resp.text
+
+    def test_predict_page_shows_table(self, client, session_csv):
+        """Prediction page contains threshold table."""
+        resp = client.get(f"/session/{session_csv.name}/predict")
+        assert resp.status_code == 200
+        assert "Threshold Predictions" in resp.text
+        assert "Regression Summary" in resp.text
+
+    def test_api_predict(self, client, session_csv):
+        """GET /api/session/{name}/predict returns JSON prediction data."""
+        resp = client.get(f"/api/session/{session_csv.name}/predict")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "parameters" in data
+        assert "thresholds" in data
+        assert "money" in data["parameters"]
+        assert "regression" in data["parameters"]["money"]
+        assert "forecast" in data["parameters"]["money"]
+
+    def test_session_detail_has_predict_link(self, client, session_csv):
+        """Session detail page contains the Predict button link."""
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        assert "Predict" in resp.text
+        assert f"/session/{session_csv.name}/predict" in resp.text
