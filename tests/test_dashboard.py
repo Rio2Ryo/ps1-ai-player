@@ -840,3 +840,80 @@ class TestSessionDiff:
         resp = client.get("/")
         assert resp.status_code == 200
         assert "/session/diff" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# TestSessionTags (dashboard integration)
+# ---------------------------------------------------------------------------
+
+class TestSessionTags:
+    def test_home_shows_tags_column(self, client, session_csv):
+        """Home page session table has a Tags column header."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "<th>Tags</th>" in resp.text
+
+    def test_home_tag_filter(self, client, session_csv):
+        """?tag= query param filters sessions by tag."""
+        from session_tagger import SessionTagger
+
+        tagger = SessionTagger(log_dir=dashboard.LOG_DIR)
+        tagger.tag(session_csv.name, "good_run")
+
+        # With matching tag — session appears
+        resp = client.get("/?tag=good_run")
+        assert resp.status_code == 200
+        assert "20250101_120000" in resp.text
+
+        # With non-matching tag — session does not appear
+        resp = client.get("/?tag=nonexistent")
+        assert resp.status_code == 200
+        assert "20250101_120000" not in resp.text
+
+    def test_session_detail_shows_tags(self, client, session_csv):
+        """Session detail page shows tags in summary card."""
+        from session_tagger import SessionTagger
+
+        tagger = SessionTagger(log_dir=dashboard.LOG_DIR)
+        tagger.tag(session_csv.name, "boss_fight")
+
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        assert "boss_fight" in resp.text
+        assert "Tags" in resp.text
+
+    def test_api_get_tags(self, client, session_csv):
+        """GET /api/session/{name}/tags returns tags JSON."""
+        from session_tagger import SessionTagger
+
+        tagger = SessionTagger(log_dir=dashboard.LOG_DIR)
+        tagger.tag(session_csv.name, "good_run", "failed")
+
+        resp = client.get(f"/api/session/{session_csv.name}/tags")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["csv_filename"] == session_csv.name
+        assert "good_run" in data["tags"]
+        assert "failed" in data["tags"]
+
+    def test_api_post_tags(self, client, session_csv):
+        """POST /api/session/{name}/tags adds/removes tags via JSON."""
+        # Add tags
+        resp = client.post(
+            f"/api/session/{session_csv.name}/tags",
+            json={"action": "tag", "tags": ["good_run", "boss_fight"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "good_run" in data["tags"]
+        assert "boss_fight" in data["tags"]
+
+        # Remove a tag
+        resp = client.post(
+            f"/api/session/{session_csv.name}/tags",
+            json={"action": "untag", "tags": ["boss_fight"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "good_run" in data["tags"]
+        assert "boss_fight" not in data["tags"]

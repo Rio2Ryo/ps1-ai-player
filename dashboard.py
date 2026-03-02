@@ -136,15 +136,38 @@ def _load_session(csv_filename: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
-async def home():
+async def home(request: Request):
     """Home page — list all sessions and links to sample data."""
     from session_replay import SessionData
+    from session_tagger import SessionTagger
 
     sessions = SessionData.discover_sessions(LOG_DIR)
+    tagger = SessionTagger(log_dir=LOG_DIR)
+
+    # Tag filter
+    tag_filter = request.query_params.get("tag")
+    if tag_filter:
+        filtered_names = set(tagger.sessions_with_tag(tag_filter))
+        sessions = [s for s in sessions if s.csv_path.name in filtered_names]
+
+    all_tags = tagger.all_known_tags()
+
+    body = "<h1>Sessions</h1>"
+
+    # Tag filter dropdown
+    if all_tags:
+        body += '<form method="get"><label>Filter by tag: <select name="tag">'
+        body += '<option value="">All</option>'
+        for t in all_tags:
+            sel = ' selected' if t == tag_filter else ''
+            body += f'<option value="{t}"{sel}>{t}</option>'
+        body += '</select></label> <button class="btn" type="submit">Filter</button></form>'
 
     rows = ""
     for s in sessions:
         link = f"/session/{s.csv_path.name}"
+        tags = tagger.get_tags(s.csv_path.name)
+        tags_str = ", ".join(tags) if tags else ""
         rows += (
             f"<tr>"
             f"<td><a href=\"{link}\">{s.timestamp}</a></td>"
@@ -152,14 +175,14 @@ async def home():
             f"<td>{s.total_steps}</td>"
             f"<td>${s.cost_usd:.4f}</td>"
             f"<td>{s.duration_seconds:.1f}s</td>"
+            f"<td>{tags_str}</td>"
             f"</tr>"
         )
 
-    body = "<h1>Sessions</h1>"
     if rows:
         body += (
             "<table><tr><th>Timestamp</th><th>Game ID</th>"
-            "<th>Steps</th><th>Cost</th><th>Duration</th></tr>"
+            "<th>Steps</th><th>Cost</th><th>Duration</th><th>Tags</th></tr>"
             f"{rows}</table>"
         )
     else:
@@ -322,7 +345,11 @@ async def api_session_diff(request: Request):
 @app.get("/session/{csv_filename}", response_class=HTMLResponse)
 async def session_detail(csv_filename: str):
     """Single session detail page with summary and charts."""
+    from session_tagger import SessionTagger
+
     session = _load_session(csv_filename)
+    tagger = SessionTagger(log_dir=LOG_DIR)
+    tags = tagger.get_tags(csv_filename)
 
     # Summary card
     body = f"<h1>Session: {session.timestamp}</h1>"
@@ -332,6 +359,21 @@ async def session_detail(csv_filename: str):
     body += f"<p><strong>Duration:</strong> {session.duration_seconds:.1f}s</p>"
     body += f"<p><strong>Cost:</strong> ${session.cost_usd:.4f}</p>"
     body += f"<p><strong>Parameters:</strong> {', '.join(session.parameters)}</p>"
+    tags_str = ", ".join(tags) if tags else "<em>none</em>"
+    body += f"<p><strong>Tags:</strong> {tags_str}</p>"
+    body += "</div>"
+
+    # Quick-tag form
+    body += '<div class="card"><h3>Manage Tags</h3>'
+    body += f'<form method="post" action="/api/session/{csv_filename}/tags">'
+    body += '<input type="hidden" name="action" value="tag">'
+    body += '<input type="text" name="tags" placeholder="tag1, tag2, ..." style="padding:6px;width:300px;">'
+    body += ' <button class="btn" type="submit">Add Tags</button></form>'
+    if tags:
+        body += f'<form method="post" action="/api/session/{csv_filename}/tags" style="margin-top:8px;">'
+        body += '<input type="hidden" name="action" value="untag">'
+        body += '<input type="text" name="tags" placeholder="tag to remove" style="padding:6px;width:300px;">'
+        body += ' <button class="btn" type="submit" style="background:#e53935;">Remove Tags</button></form>'
     body += "</div>"
 
     # Time-series chart (inline base64)
@@ -1524,6 +1566,58 @@ async def api_monitor_screenshot():
     latest = max(candidates, key=lambda p: p.stat().st_mtime)
     media = "image/jpeg" if latest.suffix.lower() in (".jpg", ".jpeg") else "image/png"
     return Response(content=latest.read_bytes(), media_type=media)
+
+
+# ---------------------------------------------------------------------------
+# Routes: Session Tags API
+# ---------------------------------------------------------------------------
+
+@app.get("/api/session/{csv_filename}/tags")
+async def api_get_tags(csv_filename: str):
+    """JSON API: get tags for a session."""
+    from session_tagger import SessionTagger
+
+    tagger = SessionTagger(log_dir=LOG_DIR)
+    tags = tagger.get_tags(csv_filename)
+    return JSONResponse(content={"csv_filename": csv_filename, "tags": tags})
+
+
+@app.post("/api/session/{csv_filename}/tags")
+async def api_post_tags(csv_filename: str, request: Request):
+    """Add or remove tags for a session.
+
+    Accepts form data or JSON with ``action`` (tag/untag) and ``tags``
+    (comma-separated string or list).  Returns updated tags and redirects
+    to the session detail page when submitted from a browser form.
+    """
+    from session_tagger import SessionTagger
+
+    tagger = SessionTagger(log_dir=LOG_DIR)
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        body = await request.json()
+        action = body.get("action", "tag")
+        raw_tags = body.get("tags", [])
+        if isinstance(raw_tags, str):
+            raw_tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+    else:
+        form = await request.form()
+        action = form.get("action", "tag")
+        raw_tags_str = form.get("tags", "")
+        raw_tags = [t.strip() for t in raw_tags_str.split(",") if t.strip()]
+
+    if action == "untag":
+        result = tagger.untag(csv_filename, *raw_tags)
+    else:
+        result = tagger.tag(csv_filename, *raw_tags)
+
+    # If request came from a form, redirect back to session detail
+    if "application/json" not in content_type:
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url=f"/session/{csv_filename}", status_code=303)
+
+    return JSONResponse(content={"csv_filename": csv_filename, "tags": result})
 
 
 # ---------------------------------------------------------------------------

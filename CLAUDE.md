@@ -96,7 +96,8 @@ pipeline.py (post-session analysis)
 | `strategy_optimizer.py` | Strategy auto-tuner: threshold value tuning (percentile-based), priority rebalancing (strategy score), new threshold suggestions. CLI: optimize |
 | `memory_watcher.py` | Real-time parameter watcher: threshold alerts (lt/gt/le/ge), sliding-window spike detection (z-score), strategy config interop (from_strategy_config), SSE-ready alert accumulation. CLI: check |
 | `replay_diff.py` | Step-level diff between two sessions: StepDiff/ParamDelta dataclasses, divergence point detection, per-parameter trajectory comparison, markdown/JSON reports. CLI: diff |
-| `dashboard.py` | FastAPI web dashboard: browse sessions, charts, GDD docs, JSON API, action replay + action analysis pages, live monitoring (/monitor + /api/monitor), cross-analysis + anomaly alerts, session ZIP export, strategy optimizer (/optimize + /api/optimize), memory watcher (/watcher + /api/watcher/alerts + /api/watcher/events SSE), session diff (/session/diff + /api/session/diff) |
+| `session_tagger.py` | Session tag/label system: add/remove/list tags per session, persisted in `session_tags.json`. CLI: tag/untag/list-tags/show |
+| `dashboard.py` | FastAPI web dashboard: browse sessions, charts, GDD docs, JSON API, action replay + action analysis pages, live monitoring (/monitor + /api/monitor), cross-analysis + anomaly alerts, session ZIP export, strategy optimizer (/optimize + /api/optimize), memory watcher (/watcher + /api/watcher/alerts + /api/watcher/events SSE), session diff (/session/diff + /api/session/diff), session tags (/api/session/{name}/tags GET+POST, tag filter on home page) |
 | `demo_run.py` | E2E demo: --genre rpg/action/themepark → analysis → GDD → charts (no API key needed) |
 | `sample_data/DEMO.json` | Demo memory address definitions (GameAddresses format) |
 | `sample_data/expected_output/` | Pre-generated pipeline outputs (GDD, causal chains) |
@@ -182,6 +183,12 @@ python replay_diff.py diff logs/session_a.csv logs/session_b.csv
 python replay_diff.py diff logs/session_a.csv logs/session_b.csv --format json --output diff.json
 python replay_diff.py diff logs/session_a.csv logs/session_b.csv --param hp
 
+# Session tagging
+python session_tagger.py tag 20250101_120000_DEMO_agent.csv good_run boss_fight
+python session_tagger.py untag 20250101_120000_DEMO_agent.csv boss_fight
+python session_tagger.py list-tags --log-dir logs/
+python session_tagger.py show 20250101_120000_DEMO_agent.csv --log-dir logs/
+
 # Strategy optimisation
 python strategy_optimizer.py optimize config/strategies/rpg.json --log-dir logs/
 python strategy_optimizer.py optimize config/strategies/rpg.json --log-dir logs/ --format markdown
@@ -239,6 +246,7 @@ python lua_generator.py --game SLPM-86023
 - **Configurable monitor**: `ScreenCapture(default_monitor=N)` and `AIAgent --monitor N` CLI flag
 - **Generic simulation hierarchy**: `GenericAgent`/`GenericElement`/`GenericGameSimulator` base classes with `ThemePark`/`RPG`/`Action` subclasses. Backwards compat aliases: `ParkSimulator = ThemeParkSimulator`, `VisitorAgent = ThemeParkAgent`, `RideAttraction = ThemeParkAttraction`
 - **GDD DRY sections**: `_generate_analysis_sections()` private method called by both `generate_local_gdd()` and `generate_full_gdd()` to avoid section duplication
+- **Session tagging**: `session_tagger.py` — `SessionTagger` class persists user-defined tags (e.g. "good_run", "boss_fight", "failed") per session CSV in `{log_dir}/session_tags.json`. Methods: `tag()`, `untag()`, `get_tags()`, `list_tags()`, `sessions_with_tag()`, `all_known_tags()`. Tags are lowercase-stripped and deduplicated. CLI: `python session_tagger.py tag|untag|list-tags|show [--log-dir]`. Dashboard integration: home page Tags column + `?tag=` filter, session detail tag display + quick-tag form, `/api/session/{name}/tags` GET+POST endpoints
 - **Web dashboard**: `dashboard.py` — single-file FastAPI app with inline HTML templates. Charts rendered server-side via `visualizer.py` functions (temp file → PNG bytes). JSON API at `/api/sessions`, `/api/session/{name}`, `/api/session/{name}/data`, `/api/cross-analysis`. Step-through replay page at `/session/{name}/replay?step=N` with parameter deltas and streak indicators. Action analysis page at `/session/{name}/actions` with frequency table, transition matrix, parameter impact, and top streaks. **Cross-session analysis**: `/cross-analysis` page shows session progression, parameter evolution with trend coloring, strategy effectiveness comparison, action effectiveness per parameter, and heuristic recommendations; `?game=` filter support; `/api/cross-analysis` JSON endpoint. **Live monitoring**: `/monitor` page auto-refreshes every 5s, shows active session parameters with deltas/trends, latest step card, recent actions table, and screenshot placeholder. `/api/monitor` JSON endpoint for programmatic access, `/api/monitor/screenshot` serves latest capture image (404 if none). `_find_active_session()` picks the most recently modified `*_agent.csv` in LOG_DIR. CLI: `python dashboard.py [--host] [--port] [--log-dir] [--reports-dir] [--captures-dir]`
 
 ## Environment
