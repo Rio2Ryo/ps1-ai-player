@@ -89,11 +89,19 @@ pipeline.py (post-session analysis)
 | `sample_data/generate_rpg_sample.py` | RPG dungeon crawl synthetic data generator |
 | `sample_data/generate_action_sample.py` | Action/platformer synthetic data generator |
 | `preflight_check.py` | E2E pre-flight checker (ISO/BIOS/DuckStation/venv/API key) |
+| `session_replay.py` | Session replay viewer: load, view, compare, analyze past agent sessions. ActionAnalyzer for action frequency/transitions/streaks/parameter-impact. CLI: list/show/timeline/compare/events/replay |
+| `cross_session_analyzer.py` | Cross-session learning: aggregate multi-session data for strategy effectiveness scoring, parameter trend evolution, action-outcome correlations, and actionable recommendations. CLI: analyze |
+| `session_exporter.py` | Session ZIP export/import: bundle CSV + session.json + history.json + analysis reports into ZIP. CLI: export/import/list |
+| `anomaly_detector.py` | Anomaly detection: parameter spike detection (z-score), action pattern deviation, cross-session regression detection. CLI: detect |
+| `strategy_optimizer.py` | Strategy auto-tuner: threshold value tuning (percentile-based), priority rebalancing (strategy score), new threshold suggestions. CLI: optimize |
+| `memory_watcher.py` | Real-time parameter watcher: threshold alerts (lt/gt/le/ge), sliding-window spike detection (z-score), strategy config interop (from_strategy_config), SSE-ready alert accumulation. CLI: check |
+| `replay_diff.py` | Step-level diff between two sessions: StepDiff/ParamDelta dataclasses, divergence point detection, per-parameter trajectory comparison, markdown/JSON reports. CLI: diff |
+| `dashboard.py` | FastAPI web dashboard: browse sessions, charts, GDD docs, JSON API, action replay + action analysis pages, live monitoring (/monitor + /api/monitor), cross-analysis + anomaly alerts, session ZIP export, strategy optimizer (/optimize + /api/optimize), memory watcher (/watcher + /api/watcher/alerts + /api/watcher/events SSE), session diff (/session/diff + /api/session/diff) |
 | `demo_run.py` | E2E demo: --genre rpg/action/themepark → analysis → GDD → charts (no API key needed) |
 | `sample_data/DEMO.json` | Demo memory address definitions (GameAddresses format) |
 | `sample_data/expected_output/` | Pre-generated pipeline outputs (GDD, causal chains) |
 | `config/strategies/` | Genre-specific strategy configs (rpg, action, sports, puzzle, themepark) |
-| `tests/` | pytest suite (347 tests) |
+| `tests/` | pytest suite (~590 tests) |
 | `DOCS/E2E_GUIDE.md` | run.sh E2E flow verification guide (step-by-step commands + troubleshooting) |
 | `DOCS/STRATEGY_GUIDE.md` | Genre-specific memory address + strategy config setup guide |
 | `pyproject.toml` | Project metadata + pytest configuration |
@@ -139,6 +147,51 @@ python game_prototype.py --frames 3600 --verbose --csv-output reports/sim_output
 python game_prototype.py --genre rpg --frames 3600 --verbose
 python game_prototype.py --genre action --frames 3600 --verbose
 
+# Session replay — list / show / timeline / compare / events / replay
+python session_replay.py list --log-dir logs/
+python session_replay.py show logs/20250101_120000_DEMO_agent.csv
+python session_replay.py timeline logs/20250101_120000_DEMO_agent.csv --start 0 --end 10
+python session_replay.py compare logs/session1.csv logs/session2.csv
+python session_replay.py events logs/20250101_120000_DEMO_agent.csv --param hp --condition "< 50"
+python session_replay.py replay logs/20250101_120000_DEMO_agent.csv            # full action analysis report
+python session_replay.py replay logs/20250101_120000_DEMO_agent.csv --actions  # action frequency table only
+python session_replay.py replay logs/20250101_120000_DEMO_agent.csv --step 5   # enriched step detail
+
+# Cross-session analysis
+python cross_session_analyzer.py analyze --log-dir logs/
+python cross_session_analyzer.py analyze --log-dir logs/ --game DEMO --format json
+python cross_session_analyzer.py analyze --log-dir logs/ --output reports/cross_analysis.md
+
+# Session export/import
+python session_exporter.py export logs/20250101_120000_DEMO_agent.csv --output exports/session.zip
+python session_exporter.py import exports/session.zip --target-dir logs/
+python session_exporter.py list exports/session.zip
+
+# Anomaly detection
+python anomaly_detector.py detect --log-dir logs/
+python anomaly_detector.py detect --log-dir logs/ --format json --spike-threshold 3.0
+
+# Memory watcher
+python memory_watcher.py check logs/20250101_120000_DEMO_agent.csv
+python memory_watcher.py check logs/20250101_120000_DEMO_agent.csv --strategy config/strategies/rpg.json
+python memory_watcher.py check logs/20250101_120000_DEMO_agent.csv --rules rules.json --format json
+python memory_watcher.py check logs/20250101_120000_DEMO_agent.csv --spike-threshold 3.0 --output report.md
+
+# Session diff (step-level)
+python replay_diff.py diff logs/session_a.csv logs/session_b.csv
+python replay_diff.py diff logs/session_a.csv logs/session_b.csv --format json --output diff.json
+python replay_diff.py diff logs/session_a.csv logs/session_b.csv --param hp
+
+# Strategy optimisation
+python strategy_optimizer.py optimize config/strategies/rpg.json --log-dir logs/
+python strategy_optimizer.py optimize config/strategies/rpg.json --log-dir logs/ --format markdown
+python strategy_optimizer.py optimize config/strategies/rpg.json --log-dir logs/ --output optimized_rpg.json
+
+# Web dashboard
+python dashboard.py --port 8080
+python dashboard.py --host 127.0.0.1 --port 8080 --log-dir logs/ --reports-dir reports/
+python dashboard.py --port 8080 --captures-dir captures/  # with screenshot captures dir
+
 # Memory scanning (requires DuckStation running)
 sudo python memory_scanner.py
 
@@ -175,10 +228,18 @@ python lua_generator.py --game SLPM-86023
 - **Parameter role inference**: `_infer_parameter_role()` uses keyword heuristics + statistical classification instead of hardcoded roles
 - **Parameter classification**: `_classify_parameter()` uses 4-quartile monotonicity check to avoid U/V-shape misclassification
 - **Session summary**: Agent saves .session.json with cost, game_state transitions, and strategy switch history
+- **Session replay**: `session_replay.py` loads CSV + .session.json + .history.json artifacts. `SessionData` auto-discovers sidecars from CSV path. `SessionTimeline` for step-by-step replay, event search (`find_events`), and `get_step_enriched()` (merges .history.json multi-action data). `ActionAnalyzer` for action frequency, action→next transition matrix, action→parameter-delta impact, and consecutive action streak detection. `SessionComparator` for multi-session comparison with param stats, action frequency comparison (`compare_actions`), per-session transition matrices (`compare_action_transitions`), and markdown report output. CLI subcommands: list/show/timeline/compare/events/replay
+- **Session export/import**: `session_exporter.py` bundles session CSV + .session.json + .history.json + generated analysis reports (action_report.md, cross_session.md/json) into a ZIP archive via `SessionExporter.export_zip()` / `export_bytes()`. `import_zip()` extracts only session artifacts (skips analysis/). Dashboard integration: `/session/{name}/export` returns ZIP download. CLI: `python session_exporter.py export|import|list`
+- **Strategy optimisation**: `strategy_optimizer.py` auto-tunes strategy JSON thresholds from session data. `StrategyOptimizer` takes a strategy config + session list. `tune_thresholds()` shifts lt/gt values toward observed p25/p75. `rebalance_priorities()` boosts priorities for best-performing strategies. `suggest_new_thresholds()` proposes rules for parameters with high coefficient of variation but no existing threshold. `optimize()` runs full pipeline, `diff()` for human-readable changes, `to_markdown()` for report. Dashboard: `/optimize` page with strategy selector, `/api/optimize` JSON endpoint. CLI: `python strategy_optimizer.py optimize config/strategies/rpg.json --log-dir logs/`
+- **Memory watcher**: `memory_watcher.py` provides real-time parameter monitoring. `MemoryWatcher` takes a list of `ThresholdRule` objects (parameter/operator/value/severity/message) and checks values against them + performs sliding-window z-score spike detection. `check_value(param, val, ts)` returns new alerts, `check_values(dict, ts)` checks multiple params at once. `WatcherAlert` dataclass (kind/severity/parameter/value/description/timestamp/details). `from_strategy_config(config)` classmethod converts strategy JSON thresholds (priority → severity: >=8 high, >=5 medium, else low). `alert_summary()` / `to_dict()` / `to_markdown()` for output. Dashboard: `/watcher` page with auto-refresh + SSE JavaScript, `/api/watcher/alerts` JSON, `/api/watcher/events` SSE endpoint. CLI: `python memory_watcher.py check <csv> [--rules R] [--strategy S] [--spike-threshold T]`
+- **Anomaly detection**: `anomaly_detector.py` detects three anomaly types: (1) `detect_spikes()` — z-score on step-to-step deltas identifies sudden parameter changes, (2) `detect_action_deviations()` — flags sessions where action frequency proportions deviate from cross-session mean, (3) `detect_regressions()` — flags parameters that worsen in latest session vs prior average. `Anomaly` dataclass with kind/severity/session/description/details. `detect_all()` aggregates, `summary()` returns JSON-serialisable dict, `to_markdown()` for reports. Integrated into dashboard `/cross-analysis` page as alert panel. CLI: `python anomaly_detector.py detect --log-dir logs/`
+- **Session diff**: `replay_diff.py` provides step-level diff between two sessions. `ReplayDiff` takes two `SessionData` objects, aligns by step number, and produces `StepDiff` entries with `ParamDelta` per parameter. `step_diffs()` returns union of all steps, `divergence_points()` filters to action-diverged steps, `param_comparison(param)` returns DataFrame with side-by-side values + diff columns, `summary()` for high-level stats (divergence rate, mean param diffs), `to_markdown()` / `to_dict()` for report output. Dashboard: `/session/diff` page with session selector and color-coded divergence table, `/api/session/diff` JSON endpoint. CLI: `python replay_diff.py diff <a.csv> <b.csv> [--format json] [--output file] [--param hp]`
+- **Cross-session analysis**: `cross_session_analyzer.py` aggregates data from multiple `SessionData` objects. `CrossSessionAnalyzer` computes `merged_df()` (pooled DataFrame with session_id), `parameter_evolution()` (per-session stats with trend detection), `strategy_effectiveness()` (per-strategy param aggregation), `action_effectiveness(param)` (pooled action→delta), `session_progression()` (one-row-per-session metrics), `common_patterns()` (pooled frequencies/transitions/streaks), `recommendations()` (heuristic text advice), `to_markdown()` / `to_dict()`. CLI: `python cross_session_analyzer.py analyze --log-dir logs/ [--game GAME_ID] [--format json] [--output file]`
 - **GameLogger column ordering**: CSV columns sorted alphabetically for consistent output across sessions
 - **Configurable monitor**: `ScreenCapture(default_monitor=N)` and `AIAgent --monitor N` CLI flag
 - **Generic simulation hierarchy**: `GenericAgent`/`GenericElement`/`GenericGameSimulator` base classes with `ThemePark`/`RPG`/`Action` subclasses. Backwards compat aliases: `ParkSimulator = ThemeParkSimulator`, `VisitorAgent = ThemeParkAgent`, `RideAttraction = ThemeParkAttraction`
 - **GDD DRY sections**: `_generate_analysis_sections()` private method called by both `generate_local_gdd()` and `generate_full_gdd()` to avoid section duplication
+- **Web dashboard**: `dashboard.py` — single-file FastAPI app with inline HTML templates. Charts rendered server-side via `visualizer.py` functions (temp file → PNG bytes). JSON API at `/api/sessions`, `/api/session/{name}`, `/api/session/{name}/data`, `/api/cross-analysis`. Step-through replay page at `/session/{name}/replay?step=N` with parameter deltas and streak indicators. Action analysis page at `/session/{name}/actions` with frequency table, transition matrix, parameter impact, and top streaks. **Cross-session analysis**: `/cross-analysis` page shows session progression, parameter evolution with trend coloring, strategy effectiveness comparison, action effectiveness per parameter, and heuristic recommendations; `?game=` filter support; `/api/cross-analysis` JSON endpoint. **Live monitoring**: `/monitor` page auto-refreshes every 5s, shows active session parameters with deltas/trends, latest step card, recent actions table, and screenshot placeholder. `/api/monitor` JSON endpoint for programmatic access, `/api/monitor/screenshot` serves latest capture image (404 if none). `_find_active_session()` picks the most recently modified `*_agent.csv` in LOG_DIR. CLI: `python dashboard.py [--host] [--port] [--log-dir] [--reports-dir] [--captures-dir]`
 
 ## Environment
 
