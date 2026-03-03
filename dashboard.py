@@ -75,6 +75,7 @@ _NAV = """\
   <a href="/session/diff">Diff</a>
   <a href="/cross-analysis">Cross-Analysis</a>
   <a href="/parameters">Parameters</a>
+  <a href="/groups">Groups</a>
   <a href="/reports">Reports</a>
   <a href="/optimize">Optimize</a>
   <a href="/gdd">GDD Docs</a>
@@ -2899,6 +2900,209 @@ async def api_reports_generate(request: Request):
             from starlette.responses import RedirectResponse
             return RedirectResponse(url="/reports", status_code=303)
         return JSONResponse(content={"report": output, "saved_to": str(report_path)})
+
+
+# ---------------------------------------------------------------------------
+# Routes: Session Groups
+# ---------------------------------------------------------------------------
+
+@app.get("/groups", response_class=HTMLResponse)
+async def groups_page(request: Request):
+    """Session groups page — list, create, view details."""
+    from session_group import SessionGroupManager
+    from session_replay import SessionData
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    groups = mgr.list_groups()
+
+    # Check if viewing a specific group
+    show_group = request.query_params.get("name", "").strip()
+
+    body = "<h1>Session Groups</h1>"
+
+    # Create group form
+    body += '<div class="card"><h3>Create Group</h3>'
+    body += '<form method="post" action="/api/groups">'
+    body += '<input type="hidden" name="action" value="create">'
+    body += '<label>Name: <input type="text" name="name" required style="padding:6px;width:200px;"></label> '
+    body += '<label>Description: <input type="text" name="description" placeholder="optional" style="padding:6px;width:300px;"></label> '
+    body += '<button class="btn" type="submit">Create</button>'
+    body += '</form></div>'
+
+    # Group list
+    if groups:
+        body += "<h2>All Groups</h2>"
+        body += "<table><tr><th>Group</th><th>Description</th><th>Members</th><th>Actions</th></tr>"
+        for g in groups:
+            body += (
+                f'<tr><td><a href="/groups?name={g.name}">{g.name}</a></td>'
+                f'<td>{g.description}</td>'
+                f'<td>{len(g.members)}</td>'
+                f'<td>'
+                f'<form method="post" action="/api/groups" style="display:inline;">'
+                f'<input type="hidden" name="action" value="delete">'
+                f'<input type="hidden" name="name" value="{g.name}">'
+                f'<button class="btn" type="submit" style="background:#e53935;font-size:12px;padding:4px 8px;">Delete</button>'
+                f'</form></td></tr>'
+            )
+        body += "</table>"
+    else:
+        body += "<p>No groups defined yet.</p>"
+
+    # Group detail
+    if show_group:
+        try:
+            stats = mgr.group_stats(show_group)
+            group_data = stats["group"]
+            body += f'<h2>Group: {group_data["name"]}</h2>'
+            body += '<div class="card">'
+            body += f'<p><strong>Description:</strong> {group_data["description"] or "(none)"}</p>'
+            body += f'<p><strong>Members:</strong> {stats["member_count"]} ({stats["sessions_found"]} found in logs)</p>'
+            if stats["avg_score"] is not None:
+                body += f'<p><strong>Avg Score:</strong> {stats["avg_score"]:.1f}</p>'
+            body += f'<p><strong>Avg Steps:</strong> {stats["avg_steps"]:.1f}</p>'
+            body += f'<p><strong>Avg Cost:</strong> ${stats["avg_cost_usd"]:.4f}</p>'
+            body += '</div>'
+
+            # Parameter comparison table
+            pc = stats["param_comparison"]
+            if pc:
+                body += '<h3>Parameter Comparison</h3>'
+                body += '<table><tr><th>Parameter</th><th>Mean</th><th>Min</th><th>Max</th><th>Std</th></tr>'
+                for p, vals in pc.items():
+                    body += (
+                        f'<tr><td>{p}</td><td>{vals["mean"]:.2f}</td>'
+                        f'<td>{vals["min"]:.2f}</td><td>{vals["max"]:.2f}</td>'
+                        f'<td>{vals["std"]:.2f}</td></tr>'
+                    )
+                body += '</table>'
+
+            # Member details
+            details = stats["member_details"]
+            if details:
+                body += '<h3>Member Sessions</h3>'
+                body += '<table><tr><th>Session</th><th>Game</th><th>Score</th><th>Steps</th><th>Cost</th></tr>'
+                for d in details:
+                    link = f'/session/{d["csv_filename"]}'
+                    body += (
+                        f'<tr><td><a href="{link}">{d["csv_filename"]}</a></td>'
+                        f'<td>{d["game_id"]}</td>'
+                        f'<td>{d["score"]:.1f}</td>'
+                        f'<td>{d["steps"]}</td>'
+                        f'<td>${d["cost_usd"]:.4f}</td></tr>'
+                    )
+                body += '</table>'
+
+            # Add session form
+            sessions = SessionData.discover_sessions(LOG_DIR)
+            if sessions:
+                body += '<div class="card"><h3>Add Session to Group</h3>'
+                body += f'<form method="post" action="/api/groups">'
+                body += f'<input type="hidden" name="action" value="add">'
+                body += f'<input type="hidden" name="name" value="{show_group}">'
+                body += '<select name="csv_filename" style="padding:6px;">'
+                for s in sessions:
+                    sel = ""
+                    if s.csv_path.name in group_data["members"]:
+                        sel = ' disabled'
+                    body += f'<option value="{s.csv_path.name}"{sel}>{s.timestamp} ({s.game_id})</option>'
+                body += '</select> '
+                body += '<button class="btn" type="submit">Add</button></form></div>'
+
+            # Remove session form
+            if group_data["members"]:
+                body += '<div class="card"><h3>Remove Session from Group</h3>'
+                body += f'<form method="post" action="/api/groups">'
+                body += f'<input type="hidden" name="action" value="remove">'
+                body += f'<input type="hidden" name="name" value="{show_group}">'
+                body += '<select name="csv_filename" style="padding:6px;">'
+                for m in group_data["members"]:
+                    body += f'<option value="{m}">{m}</option>'
+                body += '</select> '
+                body += '<button class="btn" type="submit" style="background:#e53935;">Remove</button></form></div>'
+
+        except KeyError:
+            body += f'<p>Group not found: {show_group}</p>'
+
+    return _render("Groups", body)
+
+
+@app.get("/api/groups")
+async def api_groups():
+    """Return all groups as JSON."""
+    from session_group import SessionGroupManager
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    return JSONResponse(content=mgr.to_dict())
+
+
+@app.get("/api/groups/{name}")
+async def api_group_stats(name: str):
+    """Return stats for a specific group."""
+    from session_group import SessionGroupManager
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    try:
+        stats = mgr.group_stats(name)
+        return JSONResponse(content=stats)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Group not found: {name}")
+
+
+@app.post("/api/groups")
+async def api_groups_action(request: Request):
+    """Handle group CRUD actions via form POST."""
+    from session_group import SessionGroupManager
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        data = await request.json()
+    else:
+        form = await request.form()
+        data = dict(form)
+
+    action = data.get("action", "")
+    name = data.get("name", "").strip()
+
+    if action == "create":
+        description = data.get("description", "")
+        try:
+            mgr.create_group(name, description=description)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    elif action == "delete":
+        try:
+            mgr.delete_group(name)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    elif action == "add":
+        csv_filename = data.get("csv_filename", "").strip()
+        try:
+            mgr.add_sessions(name, csv_filename)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    elif action == "remove":
+        csv_filename = data.get("csv_filename", "").strip()
+        try:
+            mgr.remove_sessions(name, csv_filename)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+
+    # For form submissions, redirect back to groups page
+    if "application/json" not in content_type:
+        from starlette.responses import RedirectResponse
+        redirect_url = f"/groups?name={name}" if action in ("add", "remove") else "/groups"
+        return RedirectResponse(url=redirect_url, status_code=303)
+
+    return JSONResponse(content={"status": "ok", "action": action, "name": name})
 
 
 # ---------------------------------------------------------------------------

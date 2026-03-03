@@ -1482,3 +1482,151 @@ class TestSessionTimeline:
         """GET /api/session/nonexistent/timeline returns 404."""
         resp = client.get("/api/session/nonexistent.csv/timeline")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# TestGroupsPage
+# ---------------------------------------------------------------------------
+
+class TestGroupsPage:
+
+    def test_groups_page_returns_200(self, client):
+        """Groups page returns 200 even with no groups."""
+        resp = client.get("/groups")
+        assert resp.status_code == 200
+        assert "Session Groups" in resp.text
+
+    def test_groups_page_has_create_form(self, client):
+        """Groups page has a create group form."""
+        resp = client.get("/groups")
+        assert resp.status_code == 200
+        assert "Create Group" in resp.text
+        assert 'name="name"' in resp.text
+
+    def test_groups_page_shows_no_groups_message(self, client):
+        """Groups page shows message when no groups exist."""
+        resp = client.get("/groups")
+        assert "No groups defined" in resp.text
+
+    def test_groups_nav_link(self, client):
+        """Home page has Groups nav link."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "/groups" in resp.text
+
+    def test_create_group_via_api(self, client):
+        """POST /api/groups with action=create creates a group."""
+        resp = client.post("/api/groups", json={
+            "action": "create",
+            "name": "Test Group",
+            "description": "A test"
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert data["name"] == "Test Group"
+
+    def test_create_group_shown_in_list(self, client):
+        """Created group appears on groups page."""
+        client.post("/api/groups", json={
+            "action": "create",
+            "name": "Visible Group",
+        })
+        resp = client.get("/groups")
+        assert "Visible Group" in resp.text
+
+    def test_add_session_to_group(self, client, session_csv):
+        """POST /api/groups with action=add adds session to group."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "G1"
+        })
+        resp = client.post("/api/groups", json={
+            "action": "add",
+            "name": "G1",
+            "csv_filename": session_csv.name,
+        })
+        assert resp.status_code == 200
+
+    def test_remove_session_from_group(self, client, session_csv):
+        """POST /api/groups with action=remove removes session."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "G1"
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "G1",
+            "csv_filename": session_csv.name,
+        })
+        resp = client.post("/api/groups", json={
+            "action": "remove", "name": "G1",
+            "csv_filename": session_csv.name,
+        })
+        assert resp.status_code == 200
+
+    def test_delete_group_via_api(self, client):
+        """POST /api/groups with action=delete deletes a group."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "ToDelete"
+        })
+        resp = client.post("/api/groups", json={
+            "action": "delete", "name": "ToDelete"
+        })
+        assert resp.status_code == 200
+
+    def test_api_groups_list(self, client):
+        """GET /api/groups returns group list as JSON."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "Alpha"
+        })
+        resp = client.get("/api/groups")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "groups" in data
+        assert "total_groups" in data
+        assert data["total_groups"] >= 1
+
+    def test_api_group_stats(self, client, session_csv):
+        """GET /api/groups/{name} returns group stats."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "Stats"
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "Stats",
+            "csv_filename": session_csv.name,
+        })
+        resp = client.get("/api/groups/Stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["member_count"] == 1
+        assert data["sessions_found"] == 1
+        assert data["avg_score"] is not None
+        assert "param_comparison" in data
+
+    def test_api_group_stats_404(self, client):
+        """GET /api/groups/nonexistent returns 404."""
+        resp = client.get("/api/groups/NoSuchGroup")
+        assert resp.status_code == 404
+
+    def test_groups_page_with_detail(self, client, session_csv):
+        """Groups page with ?name= shows group detail."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "Detail"
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "Detail",
+            "csv_filename": session_csv.name,
+        })
+        resp = client.get("/groups?name=Detail")
+        assert resp.status_code == 200
+        assert "Group: Detail" in resp.text
+        assert "Parameter Comparison" in resp.text
+        assert "Member Sessions" in resp.text
+
+    def test_create_duplicate_returns_400(self, client):
+        """Creating a duplicate group returns 400."""
+        client.post("/api/groups", json={
+            "action": "create", "name": "Dup"
+        })
+        resp = client.post("/api/groups", json={
+            "action": "create", "name": "Dup"
+        })
+        assert resp.status_code == 400
