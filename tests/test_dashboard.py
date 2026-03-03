@@ -284,6 +284,49 @@ class TestJSONAPI:
 
 
 # ---------------------------------------------------------------------------
+# TestSessionSearch
+# ---------------------------------------------------------------------------
+
+class TestSessionSearch:
+    def test_home_has_search_form(self, client, session_csv):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "Search Sessions" in resp.text
+        assert 'name="param"' in resp.text
+
+    def test_home_search_filters_results(self, client, two_sessions):
+        # Session rows=30, money last = 5000 + 29*10 = 5290
+        # Filter for money last > 9999 — should match none of test sessions
+        resp = client.get("/?param=money+last+>+9999")
+        assert resp.status_code == 200
+        assert "No sessions found" in resp.text
+
+    def test_home_search_by_steps(self, client, two_sessions):
+        # both sessions have 30 steps; filter for >=25
+        resp = client.get("/?steps=25-35")
+        assert resp.status_code == 200
+        assert "20250101_120000" in resp.text
+
+    def test_api_search_no_filter(self, client, two_sessions):
+        resp = client.get("/api/sessions/search")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 2
+
+    def test_api_search_with_param(self, client, two_sessions):
+        resp = client.get("/api/sessions/search?param=money+last+>+5200")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 1
+
+    def test_api_search_with_steps(self, client, two_sessions):
+        resp = client.get("/api/sessions/search?steps=25-35")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 2
+
+
+# ---------------------------------------------------------------------------
 # TestComparePage
 # ---------------------------------------------------------------------------
 
@@ -314,6 +357,44 @@ class TestComparePage:
             data={"sessions": [session_csv.name]},
         )
         assert resp.status_code == 400
+
+    def test_compare_result_has_overlay_charts(self, client, two_sessions):
+        resp = client.post(
+            "/compare/result",
+            data={"sessions": [p.name for p in two_sessions]},
+        )
+        assert resp.status_code == 200
+        assert "Parameter Comparison Charts" in resp.text
+        assert "data:image/png;base64," in resp.text
+
+    def test_compare_result_has_param_stats(self, client, two_sessions):
+        resp = client.post(
+            "/compare/result",
+            data={"sessions": [p.name for p in two_sessions]},
+        )
+        assert resp.status_code == 200
+        # Stats table should contain header cells for stat columns
+        assert "mean" in resp.text
+        assert "min" in resp.text
+        assert "max" in resp.text
+
+    def test_compare_result_shows_session_timestamps(self, client, two_sessions):
+        resp = client.post(
+            "/compare/result",
+            data={"sessions": [p.name for p in two_sessions]},
+        )
+        assert resp.status_code == 200
+        assert "20250101_120000" in resp.text
+        assert "20250101_130000" in resp.text
+
+    def test_compare_result_chart_per_parameter(self, client, two_sessions):
+        resp = client.post(
+            "/compare/result",
+            data={"sessions": [p.name for p in two_sessions]},
+        )
+        assert resp.status_code == 200
+        # The test sessions have 'money', 'visitors', 'satisfaction' parameters
+        assert "money" in resp.text.lower() or "overlay chart" in resp.text
 
 
 # ---------------------------------------------------------------------------

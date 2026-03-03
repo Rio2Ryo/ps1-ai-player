@@ -118,6 +118,47 @@ def _chart_to_base64(chart_func, *args, **kwargs) -> str:
     return f"data:image/png;base64,{b64}"
 
 
+def _comparison_chart_to_base64(sessions, param: str) -> str:
+    """Generate an overlay chart comparing *param* across *sessions*.
+
+    Each session is plotted as a separate color-coded line on the same axis.
+    Returns a base64 data URI for an inline ``<img>`` tag.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+              "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+    fig, ax = plt.subplots(figsize=(10, 3.5))
+    for idx, s in enumerate(sessions):
+        if param not in s.df.columns:
+            continue
+        color = colors[idx % len(colors)]
+        steps = range(len(s.df))
+        ax.plot(steps, s.df[param], linewidth=1.2, alpha=0.85,
+                color=color, label=s.timestamp)
+    ax.set_xlabel("Step")
+    ax.set_ylabel(param)
+    ax.set_title(f"{param} — Session Overlay")
+    ax.legend(fontsize=8, loc="best")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        fig.savefig(tmp_path, dpi=120)
+        plt.close(fig)
+        png_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    b64 = base64.b64encode(png_bytes).decode()
+    return f"data:image/png;base64,{b64}"
+
+
 def _load_session(csv_filename: str):
     """Load a SessionData from LOG_DIR by CSV filename."""
     from session_replay import SessionData
@@ -162,6 +203,73 @@ async def home(request: Request):
             sel = ' selected' if t == tag_filter else ''
             body += f'<option value="{t}"{sel}>{t}</option>'
         body += '</select></label> <button class="btn" type="submit">Filter</button></form>'
+
+    # Session search form
+    body += (
+        '<div class="card"><h3>Search Sessions</h3>'
+        '<form method="get" id="search-form">'
+        '<label>Parameter condition: '
+        '<input type="text" name="param" placeholder="e.g. hp last > 50" '
+        'style="width:220px;"></label> '
+        '<label>Steps: '
+        '<input type="text" name="steps" placeholder="e.g. 10-100" '
+        'style="width:100px;"></label> '
+        '<label>Date range: '
+        '<input type="text" name="date" placeholder="e.g. 20250101-20250201" '
+        'style="width:180px;"></label><br><br>'
+        '<label>Tag: '
+        '<input type="text" name="search_tag" placeholder="tag name" '
+        'style="width:120px;"></label> '
+        '<label>Note contains: '
+        '<input type="text" name="note" placeholder="search text" '
+        'style="width:150px;"></label> '
+        '<button class="btn" type="submit">Search</button>'
+        '</form></div>'
+    )
+
+    # Apply search filters if any search params are present
+    search_param = request.query_params.get("param", "").strip()
+    search_steps = request.query_params.get("steps", "").strip()
+    search_date = request.query_params.get("date", "").strip()
+    search_tag = request.query_params.get("search_tag", "").strip()
+    search_note = request.query_params.get("note", "").strip()
+
+    has_search = any([search_param, search_steps, search_date, search_tag, search_note])
+    if has_search:
+        from session_search import ParamCondition, SessionSearch
+
+        conditions = []
+        if search_param:
+            try:
+                conditions.append(ParamCondition.parse(search_param))
+            except ValueError:
+                pass  # ignore invalid condition
+
+        min_steps = max_steps = None
+        if search_steps and "-" in search_steps:
+            parts = search_steps.split("-", 1)
+            min_steps = int(parts[0]) if parts[0].strip() else None
+            max_steps = int(parts[1]) if parts[1].strip() else None
+
+        date_from = date_to = None
+        if search_date and "-" in search_date:
+            parts = search_date.split("-", 1)
+            date_from = parts[0].strip() if parts[0].strip() else None
+            date_to = parts[1].strip() if parts[1].strip() else None
+
+        searcher = SessionSearch(
+            log_dir=LOG_DIR,
+            param_conditions=conditions,
+            min_steps=min_steps,
+            max_steps=max_steps,
+            date_from=date_from,
+            date_to=date_to,
+            tag=search_tag or None,
+            note_query=search_note or None,
+        )
+        matched = searcher.search()
+        matched_names = {s.csv_path.name for s in matched}
+        sessions = [s for s in sessions if s.csv_path.name in matched_names]
 
     rows = ""
     for s in sessions:
@@ -1198,6 +1306,42 @@ async def compare_result(request: Request):
         body += "<tr>" + "".join(f"<td>{row[c]}</td>" for c in cols) + "</tr>"
     body += "</table>"
 
+    # --- Parameter overlay charts + stats tables ---
+    # Collect the union of numeric parameters across all sessions
+    all_params: list[str] = []
+    seen: set[str] = set()
+    for s in sessions:
+        for p in s.parameters:
+            if p not in seen:
+                all_params.append(p)
+                seen.add(p)
+
+    if all_params:
+        body += "<h2>Parameter Comparison Charts</h2>"
+        for param in all_params:
+            # Overlay chart
+            try:
+                src = _comparison_chart_to_base64(sessions, param)
+                body += f'<img src="{src}" alt="{param} overlay chart" '
+                body += 'style="max-width:100%;margin-bottom:8px;">'
+            except Exception:
+                body += f"<p><em>Could not generate chart for {param}</em></p>"
+
+            # Per-session stats table from compare_parameters()
+            stats = comp.compare_parameters(param)
+            if stats:
+                body += "<table><tr><th>Session</th>"
+                stat_keys = ["mean", "min", "max", "std", "first", "last"]
+                for k in stat_keys:
+                    body += f"<th>{k}</th>"
+                body += "</tr>"
+                for ts, vals in stats.items():
+                    body += f"<tr><td>{ts}</td>"
+                    for k in stat_keys:
+                        body += f"<td>{vals.get(k, '')}</td>"
+                    body += "</tr>"
+                body += "</table><br>"
+
     # Strategy diffs
     diffs = comp.diff_strategies()
     body += "<h2>Strategy Differences</h2><ul>"
@@ -1702,6 +1846,64 @@ async def api_sessions():
         }
         for s in sessions
     ])
+
+
+@app.get("/api/sessions/search")
+async def api_sessions_search(request: Request):
+    """JSON API: search/filter sessions."""
+    from session_search import ParamCondition, SessionSearch
+
+    param_strs = request.query_params.getlist("param")
+    conditions = []
+    for p in param_strs:
+        try:
+            conditions.append(ParamCondition.parse(p))
+        except ValueError:
+            pass
+
+    steps = request.query_params.get("steps", "").strip()
+    min_steps = max_steps = None
+    if steps and "-" in steps:
+        parts = steps.split("-", 1)
+        min_steps = int(parts[0]) if parts[0].strip() else None
+        max_steps = int(parts[1]) if parts[1].strip() else None
+
+    date = request.query_params.get("date", "").strip()
+    date_from = date_to = None
+    if date and "-" in date:
+        parts = date.split("-", 1)
+        date_from = parts[0].strip() if parts[0].strip() else None
+        date_to = parts[1].strip() if parts[1].strip() else None
+
+    tag = request.query_params.get("tag", "").strip() or None
+    note = request.query_params.get("note", "").strip() or None
+
+    searcher = SessionSearch(
+        log_dir=LOG_DIR,
+        param_conditions=conditions,
+        min_steps=min_steps,
+        max_steps=max_steps,
+        date_from=date_from,
+        date_to=date_to,
+        tag=tag,
+        note_query=note,
+    )
+    results = searcher.search()
+
+    return JSONResponse(content={
+        "criteria": searcher.to_dict(),
+        "count": len(results),
+        "sessions": [
+            {
+                "csv_filename": s.csv_path.name,
+                "timestamp": s.timestamp,
+                "game_id": s.game_id,
+                "total_steps": s.total_steps,
+                "cost_usd": s.cost_usd,
+            }
+            for s in results
+        ],
+    })
 
 
 @app.get("/api/session/{csv_filename}")
