@@ -230,10 +230,12 @@ def _load_session(csv_filename: str):
 async def home(request: Request):
     """Home page — list all sessions and links to sample data."""
     from session_replay import SessionData
+    from session_scorer import SessionScorer
     from session_tagger import SessionTagger
 
     sessions = SessionData.discover_sessions(LOG_DIR)
     tagger = SessionTagger(log_dir=LOG_DIR)
+    scorer = SessionScorer()
 
     # Tag filter
     tag_filter = request.query_params.get("tag")
@@ -326,6 +328,7 @@ async def home(request: Request):
         link = f"/session/{s.csv_path.name}"
         tags = tagger.get_tags(s.csv_path.name)
         tags_str = ", ".join(tags) if tags else ""
+        score_val = scorer.score(s).total
         rows += (
             f"<tr>"
             f"<td><a href=\"{link}\">{s.timestamp}</a></td>"
@@ -333,6 +336,7 @@ async def home(request: Request):
             f"<td>{s.total_steps}</td>"
             f"<td>${s.cost_usd:.4f}</td>"
             f"<td>{s.duration_seconds:.1f}s</td>"
+            f"<td>{score_val:.1f}</td>"
             f"<td>{tags_str}</td>"
             f"</tr>"
         )
@@ -340,7 +344,7 @@ async def home(request: Request):
     if rows:
         body += (
             "<table><tr><th>Timestamp</th><th>Game ID</th>"
-            "<th>Steps</th><th>Cost</th><th>Duration</th><th>Tags</th></tr>"
+            "<th>Steps</th><th>Cost</th><th>Duration</th><th>Score</th><th>Tags</th></tr>"
             f"{rows}</table>"
         )
     else:
@@ -1968,6 +1972,18 @@ async def api_sessions_search(request: Request):
             for s in results
         ],
     })
+
+
+@app.get("/api/sessions/ranking")
+async def api_sessions_ranking():
+    """JSON API: score and rank all sessions."""
+    from session_replay import SessionData
+    from session_scorer import SessionScorer
+
+    sessions = SessionData.discover_sessions(LOG_DIR)
+    scorer = SessionScorer()
+    ranking = scorer.rank_sessions(sessions)
+    return JSONResponse(content=ranking)
 
 
 @app.get("/api/session/{csv_filename}")

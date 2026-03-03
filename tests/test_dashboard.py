@@ -327,6 +327,46 @@ class TestSessionSearch:
 
 
 # ---------------------------------------------------------------------------
+# TestSessionScoring
+# ---------------------------------------------------------------------------
+
+class TestSessionScoring:
+    def test_home_shows_score_column(self, client, session_csv):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "Score" in resp.text
+
+    def test_home_shows_score_value(self, client, session_csv):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        # Score should be a number like "XX.X"
+        import re
+        # Find a cell with a decimal number (the score)
+        assert re.search(r"\d+\.\d", resp.text)
+
+    def test_api_ranking_empty(self, client):
+        resp = client.get("/api/sessions/ranking")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data == []
+
+    def test_api_ranking_with_sessions(self, client, two_sessions):
+        resp = client.get("/api/sessions/ranking")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        assert data[0]["rank"] == 1
+        assert data[1]["rank"] == 2
+        assert "score" in data[0]
+        assert "breakdown" in data[0]
+
+    def test_api_ranking_sorted_descending(self, client, two_sessions):
+        resp = client.get("/api/sessions/ranking")
+        data = resp.json()
+        assert data[0]["score"] >= data[1]["score"]
+
+
+# ---------------------------------------------------------------------------
 # TestComparePage
 # ---------------------------------------------------------------------------
 
