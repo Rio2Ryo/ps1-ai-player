@@ -1387,6 +1387,57 @@ class TestParametersPage:
 
 
 # ---------------------------------------------------------------------------
+# TestRecommendPage
+# ---------------------------------------------------------------------------
+
+class TestRecommendPage:
+    def test_recommend_page_returns_200(self, client, session_csv):
+        """GET /session/{name}/recommend returns 200."""
+        resp = client.get(f"/session/{session_csv.name}/recommend")
+        assert resp.status_code == 200
+        assert "Action Recommendations" in resp.text
+
+    def test_recommend_page_has_weights(self, client, session_csv):
+        """Recommend page shows parameter urgency weights."""
+        resp = client.get(f"/session/{session_csv.name}/recommend")
+        assert resp.status_code == 200
+        assert "Parameter Urgency" in resp.text
+
+    def test_recommend_page_has_recommendations(self, client, session_csv):
+        """Recommend page shows top recommendations."""
+        resp = client.get(f"/session/{session_csv.name}/recommend")
+        assert resp.status_code == 200
+        assert "Top Recommendations" in resp.text
+
+    def test_recommend_page_has_back_link(self, client, session_csv):
+        """Recommend page has back to session link."""
+        resp = client.get(f"/session/{session_csv.name}/recommend")
+        assert resp.status_code == 200
+        assert "Back to Session" in resp.text
+
+    def test_session_detail_has_recommend_link(self, client, session_csv):
+        """Session detail page has Recommend button."""
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        assert "/recommend" in resp.text
+
+    def test_api_recommend_returns_json(self, client, session_csv):
+        """GET /api/session/{name}/recommend returns JSON."""
+        resp = client.get(f"/api/session/{session_csv.name}/recommend")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "session" in data
+        assert "recommendations" in data
+        assert "param_weights" in data
+        assert "known_actions" in data
+
+    def test_api_recommend_404_missing(self, client):
+        """GET /api/session/nonexistent/recommend returns 404."""
+        resp = client.get("/api/session/nonexistent.csv/recommend")
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
 # TestSessionTimeline
 # ---------------------------------------------------------------------------
 

@@ -808,6 +808,7 @@ async def session_detail(csv_filename: str):
         f'<a class="btn" href="/session/{csv_filename}/replay">Step Replay</a> '
         f'<a class="btn" href="/session/{csv_filename}/actions">Action Analysis</a> '
         f'<a class="btn" href="/session/{csv_filename}/predict">Predict</a> '
+        f'<a class="btn" href="/session/{csv_filename}/recommend">Recommend</a> '
         f'<a class="btn" href="/session/{csv_filename}/export">Download ZIP</a>'
     )
 
@@ -2279,6 +2280,92 @@ async def api_optimize(request: Request):
         "diff": optimizer.diff(),
         "notes": optimized.get("_optimization_notes", []),
     })
+
+
+# ---------------------------------------------------------------------------
+# Routes: Action Recommendations
+# ---------------------------------------------------------------------------
+
+@app.get("/session/{csv_filename}/recommend", response_class=HTMLResponse)
+async def session_recommend(csv_filename: str):
+    """Action recommendation page — top actions based on historical data."""
+    from action_recommender import ActionRecommender
+    from session_replay import SessionData
+
+    session = _load_session(csv_filename)
+    training = SessionData.discover_sessions(LOG_DIR)
+
+    body = f"<h1>Action Recommendations: {session.timestamp}</h1>"
+
+    if not training:
+        body += "<p>No training sessions available.</p>"
+        body += f'<p><a class="btn" href="/session/{csv_filename}">Back to Session</a></p>'
+        return _render(f"Recommend: {session.timestamp}", body)
+
+    recommender = ActionRecommender(training, top_n=5)
+    data = recommender.to_dict(session)
+
+    # Parameter weights
+    body += '<div class="card"><h2>Parameter Urgency</h2>'
+    body += "<table><tr><th>Parameter</th><th>Weight</th><th>Priority</th></tr>"
+    for param, w in data["param_weights"].items():
+        if w >= 2.0:
+            priority = "HIGH"
+            color = "red"
+        elif w >= 1.5:
+            priority = "MEDIUM"
+            color = "#fb8c00"
+        else:
+            priority = "normal"
+            color = "gray"
+        body += (
+            f"<tr><td>{param}</td><td>{w}</td>"
+            f'<td style="color:{color};font-weight:bold">{priority}</td></tr>'
+        )
+    body += "</table></div>"
+
+    # Recommendations
+    body += '<div class="card"><h2>Top Recommendations</h2>'
+    for rec in data["recommendations"]:
+        score_color = "green" if rec["score"] > 0 else ("red" if rec["score"] < 0 else "gray")
+        body += f'<div style="border-left:4px solid {score_color};padding:8px 16px;margin:8px 0;">'
+        body += f'<h3>#{rec["rank"]}: {rec["action"]} '
+        body += f'<span style="color:{score_color}">(score: {rec["score"]})</span></h3>'
+        body += f'<p><strong>Reason:</strong> {rec["reason"]}</p>'
+        if rec["param_impacts"]:
+            body += "<table><tr><th>Parameter</th><th>Expected Delta</th></tr>"
+            for p, d in rec["param_impacts"].items():
+                d_color = "green" if d > 0 else ("red" if d < 0 else "gray")
+                body += f'<tr><td>{p}</td><td style="color:{d_color}">{d:+.4f}</td></tr>'
+            body += "</table>"
+        body += "</div>"
+    body += "</div>"
+
+    body += (
+        f'<p><a class="btn" href="/session/{csv_filename}">Back to Session</a></p>'
+    )
+
+    return _render(f"Recommend: {session.timestamp}", body)
+
+
+@app.get("/api/session/{csv_filename}/recommend")
+async def api_session_recommend(csv_filename: str):
+    """JSON API: action recommendations for a session."""
+    from action_recommender import ActionRecommender
+    from session_replay import SessionData
+
+    session = _load_session(csv_filename)
+    training = SessionData.discover_sessions(LOG_DIR)
+
+    if not training:
+        return JSONResponse(content={
+            "session": session.timestamp,
+            "recommendations": [],
+            "error": "No training sessions available",
+        })
+
+    recommender = ActionRecommender(training, top_n=5)
+    return JSONResponse(content=recommender.to_dict(session))
 
 
 # ---------------------------------------------------------------------------
