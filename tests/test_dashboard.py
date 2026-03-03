@@ -1293,3 +1293,94 @@ class TestReportsPage:
         resp = client.get("/reports")
         assert resp.status_code == 200
         assert "Last Report" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# TestParametersPage
+# ---------------------------------------------------------------------------
+
+class TestParametersPage:
+    def test_parameters_page_returns_200(self, client):
+        """GET /parameters with no sessions returns 200."""
+        resp = client.get("/parameters")
+        assert resp.status_code == 200
+        assert "Parameter Dashboard" in resp.text
+
+    def test_parameters_page_no_sessions(self, client):
+        """GET /parameters with no sessions shows empty message."""
+        resp = client.get("/parameters")
+        assert resp.status_code == 200
+        assert "No sessions found" in resp.text
+
+    def test_parameters_page_with_sessions(self, client):
+        """GET /parameters with sessions shows charts."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/parameters")
+        assert resp.status_code == 200
+        assert "Correlation Heatmap" in resp.text
+        assert "data:image/png;base64," in resp.text
+
+    def test_parameters_page_has_histograms(self, client):
+        """GET /parameters shows distribution histograms."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/parameters")
+        assert resp.status_code == 200
+        assert "Parameter Distributions" in resp.text
+
+    def test_parameters_page_has_trends(self, client):
+        """GET /parameters shows trend lines across sessions."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/parameters")
+        assert resp.status_code == 200
+        assert "Parameter Trends" in resp.text
+
+    def test_parameters_page_has_lag_correlations(self, client):
+        """GET /parameters shows lag correlation table."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/parameters")
+        assert resp.status_code == 200
+        assert "Lag Correlations" in resp.text
+
+    def test_parameters_page_game_filter(self, client):
+        """GET /parameters?game=DEMO filters by game."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/parameters?game=DEMO")
+        assert resp.status_code == 200
+        assert "Correlation Heatmap" in resp.text
+
+    def test_parameters_nav_link(self, client):
+        """Nav bar contains Parameters link."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "/parameters" in resp.text
+
+    def test_api_correlations_no_sessions(self, client):
+        """GET /api/parameters/correlations with no sessions returns empty."""
+        resp = client.get("/api/parameters/correlations")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_count"] == 0
+        assert data["correlation_matrix"] == {}
+
+    def test_api_correlations_with_sessions(self, client):
+        """GET /api/parameters/correlations returns correlation data."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/api/parameters/correlations")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_count"] == 3
+        assert "correlation_matrix" in data
+        assert "lag_correlations" in data
+        assert "parameters" in data
+        assert "money" in data["parameters"]
+        assert "param_stats" in data
+        assert "money" in data["param_stats"]
+        assert "sessions" in data["param_stats"]["money"]
+
+    def test_api_correlations_game_filter(self, client):
+        """GET /api/parameters/correlations?game=UNKNOWN returns empty."""
+        _create_multi_sessions(dashboard.LOG_DIR)
+        resp = client.get("/api/parameters/correlations?game=UNKNOWN")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_count"] == 0

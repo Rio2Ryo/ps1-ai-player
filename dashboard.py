@@ -74,6 +74,7 @@ _NAV = """\
   <a href="/compare">Compare</a>
   <a href="/session/diff">Diff</a>
   <a href="/cross-analysis">Cross-Analysis</a>
+  <a href="/parameters">Parameters</a>
   <a href="/reports">Reports</a>
   <a href="/optimize">Optimize</a>
   <a href="/gdd">GDD Docs</a>
@@ -195,6 +196,133 @@ def _action_heatmap_to_base64(heatmap_df) -> str:
                 ax.text(j, i, str(val), ha="center", va="center",
                         fontsize=7, color="black" if val < data.max() * 0.7 else "white")
 
+    fig.tight_layout()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        fig.savefig(tmp_path, dpi=120)
+        plt.close(fig)
+        png_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    b64 = base64.b64encode(png_bytes).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+def _correlation_heatmap_to_base64(corr_matrix) -> str:
+    """Render a Pearson correlation matrix as a heatmap base64 PNG."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    labels = list(corr_matrix.columns)
+    data = corr_matrix.values
+
+    size = max(4, 0.7 * len(labels))
+    fig, ax = plt.subplots(figsize=(size, size))
+    im = ax.imshow(data, cmap="RdBu_r", vmin=-1, vmax=1, interpolation="nearest")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, fontsize=8, rotation=45, ha="right")
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=8)
+    ax.set_title("Parameter Correlation Matrix")
+    fig.colorbar(im, ax=ax, shrink=0.8)
+
+    for i in range(len(labels)):
+        for j in range(len(labels)):
+            val = data[i, j]
+            color = "white" if abs(val) > 0.6 else "black"
+            ax.text(j, i, f"{val:.2f}", ha="center", va="center",
+                    fontsize=7, color=color)
+
+    fig.tight_layout()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        fig.savefig(tmp_path, dpi=120)
+        plt.close(fig)
+        png_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    b64 = base64.b64encode(png_bytes).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+def _histogram_to_base64(all_values: dict[str, list[float]]) -> str:
+    """Render per-parameter distribution histograms as a base64 PNG."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    params = list(all_values.keys())
+    n = len(params)
+    if n == 0:
+        raise ValueError("No parameters")
+
+    cols = min(3, n)
+    rows = (n + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3 * rows), squeeze=False)
+
+    for idx, param in enumerate(params):
+        r, c = divmod(idx, cols)
+        ax = axes[r][c]
+        vals = all_values[param]
+        ax.hist(vals, bins=20, color="#1565c0", alpha=0.7, edgecolor="white")
+        ax.set_title(param, fontsize=10)
+        ax.set_xlabel("Value", fontsize=8)
+        ax.set_ylabel("Frequency", fontsize=8)
+        ax.tick_params(labelsize=7)
+
+    # Hide unused axes
+    for idx in range(n, rows * cols):
+        r, c = divmod(idx, cols)
+        axes[r][c].set_visible(False)
+
+    fig.suptitle("Parameter Distributions (All Sessions)", fontsize=12)
+    fig.tight_layout()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        fig.savefig(tmp_path, dpi=120)
+        plt.close(fig)
+        png_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    b64 = base64.b64encode(png_bytes).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+def _param_trend_to_base64(sessions, param: str) -> str:
+    """Render per-session mean values as a trend line for *param*."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels: list[str] = []
+    means: list[float] = []
+    for s in sessions:
+        if param in s.df.columns:
+            labels.append(s.timestamp)
+            means.append(float(s.df[param].mean()))
+
+    if not means:
+        raise ValueError(f"No data for {param}")
+
+    fig, ax = plt.subplots(figsize=(max(6, 0.8 * len(labels)), 3.5))
+    ax.plot(range(len(means)), means, marker="o", linewidth=2,
+            color="#1565c0", markersize=6)
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, fontsize=7, rotation=45, ha="right")
+    ax.set_ylabel(param)
+    ax.set_title(f"{param} — Mean per Session")
+    ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
@@ -2243,6 +2371,187 @@ async def api_notifier_test():
     )
     result = notifier.send_all([test_alert])
     return JSONResponse(content=result)
+
+
+# ---------------------------------------------------------------------------
+# Routes: Parameter Dashboard
+# ---------------------------------------------------------------------------
+
+@app.get("/parameters", response_class=HTMLResponse)
+async def parameters_page(request: Request):
+    """Cross-session parameter correlation dashboard.
+
+    Shows correlation heatmap, distribution histograms, and per-parameter
+    mean-trend lines across all sessions.
+    """
+    import pandas as pd
+
+    from data_analyzer import CausalChainExtractor
+    from session_replay import SessionData
+
+    game_filter = request.query_params.get("game")
+    sessions = SessionData.discover_sessions(LOG_DIR, game_id=game_filter)
+
+    body = "<h1>Parameter Dashboard</h1>"
+
+    # Game filter form
+    all_sessions = SessionData.discover_sessions(LOG_DIR)
+    game_ids = sorted({s.game_id for s in all_sessions})
+    if game_ids:
+        body += '<form method="get"><label>Game: <select name="game">'
+        body += '<option value="">All</option>'
+        for gid in game_ids:
+            sel = ' selected' if gid == game_filter else ''
+            body += f'<option value="{gid}"{sel}>{gid}</option>'
+        body += '</select></label> <button class="btn" type="submit">Filter</button></form>'
+
+    if not sessions:
+        body += f"<p>No sessions found in <code>{LOG_DIR}</code>.</p>"
+        return _render("Parameters", body)
+
+    body += f"<p>Analyzing {len(sessions)} session(s).</p>"
+
+    # Collect all numeric parameters and their pooled values
+    all_params: list[str] = []
+    seen: set[str] = set()
+    for s in sessions:
+        for p in s.parameters:
+            if p not in seen:
+                all_params.append(p)
+                seen.add(p)
+
+    if not all_params:
+        body += "<p>No numeric parameters found in sessions.</p>"
+        return _render("Parameters", body)
+
+    # --- 1. Correlation heatmap via CausalChainExtractor ---
+    csv_paths = [s.csv_path for s in sessions]
+    extractor = CausalChainExtractor()
+    extractor.load_logs(csv_paths)
+    corr_matrix = extractor.compute_correlations()
+
+    if not corr_matrix.empty:
+        body += '<div class="card"><h2>Correlation Heatmap</h2>'
+        try:
+            src = _correlation_heatmap_to_base64(corr_matrix)
+            body += f'<img src="{src}" alt="Correlation heatmap" style="max-width:100%;">'
+        except Exception:
+            body += "<p>Could not generate correlation heatmap.</p>"
+        body += "</div>"
+
+    # --- 2. Parameter distribution histograms ---
+    all_values: dict[str, list[float]] = {}
+    for param in all_params:
+        vals: list[float] = []
+        for s in sessions:
+            if param in s.df.columns:
+                vals.extend(s.df[param].dropna().astype(float).tolist())
+        if vals:
+            all_values[param] = vals
+
+    if all_values:
+        body += '<div class="card"><h2>Parameter Distributions</h2>'
+        try:
+            src = _histogram_to_base64(all_values)
+            body += f'<img src="{src}" alt="Parameter distributions" style="max-width:100%;">'
+        except Exception:
+            body += "<p>Could not generate histograms.</p>"
+        body += "</div>"
+
+    # --- 3. Per-parameter trend lines across sessions ---
+    if len(sessions) >= 2:
+        body += '<div class="card"><h2>Parameter Trends Across Sessions</h2>'
+        for param in all_params:
+            try:
+                src = _param_trend_to_base64(sessions, param)
+                body += f'<h3>{param}</h3>'
+                body += f'<img src="{src}" alt="{param} trend" style="max-width:100%;margin-bottom:12px;">'
+            except Exception:
+                pass
+        body += "</div>"
+
+    # --- 4. Lag correlations summary ---
+    if not corr_matrix.empty:
+        extractor.detect_lag_correlations()
+        lag_corrs = extractor.lag_correlations
+        if lag_corrs:
+            body += '<div class="card"><h2>Lag Correlations</h2>'
+            body += "<table><tr><th>Source</th><th>Target</th><th>Lag</th>"
+            body += "<th>Correlation</th><th>p-value</th></tr>"
+            for _key, lc in lag_corrs.items():
+                corr_val = lc["correlation"]
+                color = "green" if corr_val > 0 else "red"
+                body += (
+                    f"<tr><td>{lc['source']}</td><td>{lc['target']}</td>"
+                    f"<td>{lc['lag']}</td>"
+                    f'<td style="color:{color}">{corr_val:.4f}</td>'
+                    f"<td>{lc['p_value']:.6f}</td></tr>"
+                )
+            body += "</table></div>"
+
+    return _render("Parameters", body)
+
+
+@app.get("/api/parameters/correlations")
+async def api_parameters_correlations(request: Request):
+    """JSON API: cross-session parameter correlation matrix and lag correlations."""
+    import pandas as pd
+
+    from data_analyzer import CausalChainExtractor
+    from session_replay import SessionData
+
+    game_filter = request.query_params.get("game")
+    sessions = SessionData.discover_sessions(LOG_DIR, game_id=game_filter)
+
+    if not sessions:
+        return JSONResponse(content={
+            "session_count": 0, "correlation_matrix": {}, "lag_correlations": {},
+        })
+
+    csv_paths = [s.csv_path for s in sessions]
+    extractor = CausalChainExtractor()
+    extractor.load_logs(csv_paths)
+    corr_matrix = extractor.compute_correlations()
+    extractor.detect_lag_correlations()
+
+    # Per-param stats across sessions
+    param_stats: dict[str, dict] = {}
+    all_params: list[str] = []
+    seen: set[str] = set()
+    for s in sessions:
+        for p in s.parameters:
+            if p not in seen:
+                all_params.append(p)
+                seen.add(p)
+
+    for param in all_params:
+        vals: list[float] = []
+        per_session: list[dict] = []
+        for s in sessions:
+            if param in s.df.columns:
+                col = s.df[param].dropna().astype(float)
+                vals.extend(col.tolist())
+                per_session.append({
+                    "session": s.timestamp,
+                    "mean": round(float(col.mean()), 4),
+                    "min": round(float(col.min()), 4),
+                    "max": round(float(col.max()), 4),
+                    "std": round(float(col.std()), 4),
+                })
+        if vals:
+            param_stats[param] = {
+                "global_mean": round(float(pd.Series(vals).mean()), 4),
+                "global_std": round(float(pd.Series(vals).std()), 4),
+                "sessions": per_session,
+            }
+
+    return JSONResponse(content={
+        "session_count": len(sessions),
+        "parameters": all_params,
+        "correlation_matrix": corr_matrix.round(4).to_dict() if not corr_matrix.empty else {},
+        "lag_correlations": extractor.lag_correlations,
+        "param_stats": param_stats,
+    })
 
 
 # ---------------------------------------------------------------------------
