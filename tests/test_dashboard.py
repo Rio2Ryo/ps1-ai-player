@@ -1384,3 +1384,50 @@ class TestParametersPage:
         assert resp.status_code == 200
         data = resp.json()
         assert data["session_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# TestSessionTimeline
+# ---------------------------------------------------------------------------
+
+class TestSessionTimeline:
+    def test_session_detail_has_timeline_chart(self, client, session_csv):
+        """Session detail page contains Session Timeline chart."""
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        assert "Session Timeline" in resp.text
+
+    def test_session_detail_timeline_has_image(self, client, session_csv):
+        """Session detail page has timeline chart as base64 image."""
+        resp = client.get(f"/session/{session_csv.name}")
+        assert resp.status_code == 200
+        # Count timeline chart images (should have both Time Series and Timeline)
+        assert resp.text.count("Session Timeline") >= 1
+
+    def test_api_timeline_returns_json(self, client, session_csv):
+        """GET /api/session/{name}/timeline returns timeline data."""
+        resp = client.get(f"/api/session/{session_csv.name}/timeline")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["csv_filename"] == session_csv.name
+        assert "steps" in data
+        assert "parameters" in data
+        assert "actions" in data
+        assert "action_counts" in data
+        assert len(data["steps"]) > 0
+
+    def test_api_timeline_has_param_values(self, client, session_csv):
+        """API timeline includes parameter values per step."""
+        resp = client.get(f"/api/session/{session_csv.name}/timeline")
+        data = resp.json()
+        first_step = data["steps"][0]
+        assert "step" in first_step
+        assert "action" in first_step
+        # Should have at least one parameter value
+        param_keys = [k for k in first_step if k not in ("step", "action")]
+        assert len(param_keys) > 0
+
+    def test_api_timeline_404_missing(self, client):
+        """GET /api/session/nonexistent/timeline returns 404."""
+        resp = client.get("/api/session/nonexistent.csv/timeline")
+        assert resp.status_code == 404

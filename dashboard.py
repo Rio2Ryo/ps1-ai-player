@@ -338,6 +338,85 @@ def _param_trend_to_base64(sessions, param: str) -> str:
     return f"data:image/png;base64,{b64}"
 
 
+def _timeline_chart_to_base64(session) -> str:
+    """Generate an integrated timeline chart for a session.
+
+    Shows action colour bars on a secondary axis and parameter lines on
+    the primary axis, with event markers (strategy switches, threshold
+    crossings) as vertical dashed lines.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    df = session.df
+    steps = df["step"].values if "step" in df.columns else np.arange(len(df))
+    params = session.parameters
+
+    if not params:
+        raise ValueError("No numeric parameters")
+
+    # Colour palette for parameters
+    param_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+                    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+    fig, ax1 = plt.subplots(figsize=(max(10, len(df) * 0.04), 4.5))
+
+    # Plot parameter lines
+    for idx, param in enumerate(params):
+        if param not in df.columns:
+            continue
+        color = param_colors[idx % len(param_colors)]
+        ax1.plot(steps, df[param].values, linewidth=1.2, alpha=0.8,
+                 color=color, label=param)
+
+    ax1.set_xlabel("Step")
+    ax1.set_ylabel("Parameter Value")
+    ax1.legend(fontsize=7, loc="upper left", ncol=min(len(params), 4))
+    ax1.grid(True, alpha=0.2)
+
+    # Action colour bars on secondary axis
+    if "action" in df.columns:
+        actions = df["action"].astype(str).values
+        unique_actions = sorted(set(actions))
+        action_cmap = {a: i for i, a in enumerate(unique_actions)}
+        action_colors_map = plt.cm.Set3(np.linspace(0, 1, max(len(unique_actions), 1)))
+
+        ax2 = ax1.twinx()
+        for i, (step_val, action) in enumerate(zip(steps, actions)):
+            cidx = action_cmap[action]
+            ax2.barh(cidx, 1, left=step_val, height=0.8,
+                     color=action_colors_map[cidx], alpha=0.5)
+        ax2.set_yticks(range(len(unique_actions)))
+        ax2.set_yticklabels(unique_actions, fontsize=7)
+        ax2.set_ylabel("Action", fontsize=8)
+
+    # Strategy switch markers from session_info
+    info = session.session_info or {}
+    switches = info.get("strategy_switches", [])
+    if isinstance(switches, list):
+        for sw in switches:
+            if isinstance(sw, dict) and "step" in sw:
+                ax1.axvline(x=sw["step"], color="purple", linestyle="--",
+                            alpha=0.6, linewidth=1)
+
+    ax1.set_title(f"Session Timeline: {session.timestamp}")
+    fig.tight_layout()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        fig.savefig(tmp_path, dpi=120)
+        plt.close(fig)
+        png_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    b64 = base64.b64encode(png_bytes).decode()
+    return f"data:image/png;base64,{b64}"
+
+
 def _load_session(csv_filename: str):
     """Load a SessionData from LOG_DIR by CSV filename."""
     from session_replay import SessionData
@@ -694,6 +773,15 @@ async def session_detail(csv_filename: str):
             body += f'<img class="chart" src="{src}" alt="Time Series">'
         except Exception as exc:
             body += f"<p>Chart error: {exc}</p>"
+
+    # Integrated timeline chart (actions + parameters + events)
+    if session.parameters:
+        try:
+            src = _timeline_chart_to_base64(session)
+            body += '<h2>Session Timeline</h2>'
+            body += f'<img class="chart" src="{src}" alt="Session Timeline">'
+        except Exception:
+            pass  # timeline chart is optional enhancement
 
     # Chart links
     body += "<h2>Charts</h2><ul>"
@@ -2265,6 +2353,50 @@ async def api_session_predict(csv_filename: str):
     session = _load_session(csv_filename)
     predictor = ParameterPredictor(session)
     return JSONResponse(content=predictor.to_dict())
+
+
+@app.get("/api/session/{csv_filename}/timeline")
+async def api_session_timeline(csv_filename: str):
+    """JSON API: session timeline data (actions + parameters per step)."""
+    import pandas as pd
+
+    from session_replay import SessionData, _FIXED_COLUMNS
+
+    session = _load_session(csv_filename)
+    df = session.df
+    params = session.parameters
+
+    steps: list[dict] = []
+    for _, row in df.iterrows():
+        entry: dict = {
+            "step": int(row.get("step", 0)),
+            "action": str(row.get("action", "")),
+        }
+        for p in params:
+            if p in row:
+                entry[p] = float(row[p]) if pd.notna(row[p]) else None
+        steps.append(entry)
+
+    # Strategy switches from session_info
+    info = session.session_info or {}
+    switches = info.get("strategy_switches", [])
+
+    # Action summary
+    action_counts: dict[str, int] = {}
+    if "action" in df.columns:
+        for a, cnt in df["action"].value_counts().items():
+            action_counts[str(a)] = int(cnt)
+
+    return JSONResponse(content={
+        "csv_filename": csv_filename,
+        "session": session.timestamp,
+        "total_steps": session.total_steps,
+        "parameters": params,
+        "actions": sorted(action_counts.keys()),
+        "action_counts": action_counts,
+        "strategy_switches": switches if isinstance(switches, list) else [],
+        "steps": steps,
+    })
 
 
 # ---------------------------------------------------------------------------
