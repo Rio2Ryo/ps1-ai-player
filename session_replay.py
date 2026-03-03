@@ -436,6 +436,33 @@ class ActionAnalyzer:
         streaks.sort(key=lambda s: s["length"], reverse=True)
         return streaks
 
+    def action_heatmap(self, bin_size: int = 10) -> pd.DataFrame:
+        """Build a step-interval x action-type frequency matrix.
+
+        Bins steps into intervals of *bin_size* and counts how many times
+        each action appears in each bin.  Returns a DataFrame with bin
+        labels as the index and action names as columns.
+        """
+        df = self.session.df
+        if "action" not in df.columns or len(df) == 0:
+            return pd.DataFrame()
+
+        max_step = int(df["step"].max())
+        bins = list(range(0, max_step + bin_size, bin_size))
+        labels = [f"{lo}-{lo + bin_size - 1}" for lo in bins[:-1]]
+
+        actions = sorted(df["action"].astype(str).unique())
+        result: dict[str, list[int]] = {a: [] for a in actions}
+
+        for lo in bins[:-1]:
+            hi = lo + bin_size
+            chunk = df[(df["step"] >= lo) & (df["step"] < hi)]
+            counts = chunk["action"].astype(str).value_counts()
+            for a in actions:
+                result[a].append(int(counts.get(a, 0)))
+
+        return pd.DataFrame(result, index=labels)
+
     def format_report(self) -> str:
         """Human-readable action analysis report (Markdown)."""
         lines: list[str] = ["# Action Analysis Report", ""]

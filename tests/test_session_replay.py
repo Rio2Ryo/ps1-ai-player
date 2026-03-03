@@ -484,6 +484,35 @@ class TestActionAnalyzer:
         report = analyzer.format_report()
         assert "No actions found" in report
 
+    def test_action_heatmap(self, tmp_path: Path) -> None:
+        csv_path = _write_session_files(tmp_path, num_steps=20)
+        s = SessionData.from_log_path(csv_path)
+        analyzer = ActionAnalyzer(s)
+        hm = analyzer.action_heatmap(bin_size=10)
+        # 20 steps (0-19) → 2 bins: "0-9" and "10-19"
+        assert len(hm) == 2
+        assert list(hm.index) == ["0-9", "10-19"]
+        # All 3 action types should be columns
+        assert set(hm.columns) == {"action_0", "action_1", "action_2"}
+        # Total counts should match number of steps
+        assert hm.values.sum() == 20
+
+    def test_action_heatmap_custom_bin(self, tmp_path: Path) -> None:
+        csv_path = _write_session_files(tmp_path, num_steps=20)
+        s = SessionData.from_log_path(csv_path)
+        analyzer = ActionAnalyzer(s)
+        hm = analyzer.action_heatmap(bin_size=5)
+        # 20 steps → 4 bins: "0-4", "5-9", "10-14", "15-19"
+        assert len(hm) == 4
+        assert hm.values.sum() == 20
+
+    def test_action_heatmap_empty(self, tmp_path: Path) -> None:
+        csv_path = _write_session_files(tmp_path, num_steps=0)
+        s = SessionData.from_log_path(csv_path)
+        analyzer = ActionAnalyzer(s)
+        hm = analyzer.action_heatmap()
+        assert hm.empty
+
 
 # ---------------------------------------------------------------------------
 # TestGetStepEnriched

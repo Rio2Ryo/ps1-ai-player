@@ -159,6 +159,56 @@ def _comparison_chart_to_base64(sessions, param: str) -> str:
     return f"data:image/png;base64,{b64}"
 
 
+def _action_heatmap_to_base64(heatmap_df) -> str:
+    """Render an action heatmap DataFrame as a base64 PNG data URI.
+
+    *heatmap_df* has step-interval labels as the index and action names
+    as columns, with integer counts as values.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    data = heatmap_df.values.T  # actions × intervals
+    actions = list(heatmap_df.columns)
+    intervals = list(heatmap_df.index)
+
+    fig_height = max(2.5, 0.5 * len(actions))
+    fig, ax = plt.subplots(figsize=(max(8, 0.6 * len(intervals)), fig_height))
+    im = ax.imshow(data, aspect="auto", cmap="YlOrRd", interpolation="nearest")
+    ax.set_xticks(range(len(intervals)))
+    ax.set_xticklabels(intervals, fontsize=7, rotation=45, ha="right")
+    ax.set_yticks(range(len(actions)))
+    ax.set_yticklabels(actions, fontsize=8)
+    ax.set_xlabel("Step Interval")
+    ax.set_ylabel("Action")
+    ax.set_title("Action Heatmap (count per interval)")
+    fig.colorbar(im, ax=ax, shrink=0.8)
+
+    # Annotate cells with counts
+    for i in range(len(actions)):
+        for j in range(len(intervals)):
+            val = int(data[i, j])
+            if val > 0:
+                ax.text(j, i, str(val), ha="center", va="center",
+                        fontsize=7, color="black" if val < data.max() * 0.7 else "white")
+
+    fig.tight_layout()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        fig.savefig(tmp_path, dpi=120)
+        plt.close(fig)
+        png_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    b64 = base64.b64encode(png_bytes).decode()
+    return f"data:image/png;base64,{b64}"
+
+
 def _load_session(csv_filename: str):
     """Load a SessionData from LOG_DIR by CSV filename."""
     from session_replay import SessionData
@@ -691,6 +741,20 @@ async def session_actions_view(csv_filename: str):
                 f"<td>{s['start_step']}</td><td>{s['end_step']}</td></tr>"
             )
         body += "</table></div>"
+
+    # Action heatmap (step-interval x action type)
+    heatmap_df = analyzer.action_heatmap()
+    if not heatmap_df.empty:
+        try:
+            src = _action_heatmap_to_base64(heatmap_df)
+            body += (
+                '<div class="card"><h2>Action Heatmap</h2>'
+                f'<img src="{src}" alt="Action heatmap" '
+                'style="max-width:100%;">'
+                '</div>'
+            )
+        except Exception:
+            pass
 
     return _render(f"Actions: {session.timestamp}", body)
 

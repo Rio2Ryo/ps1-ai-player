@@ -489,6 +489,14 @@ class TestActionsRoute:
         resp = client.get("/session/nonexistent.csv/actions")
         assert resp.status_code == 404
 
+    def test_actions_page_has_heatmap(self, client):
+        _create_session_with_actions(dashboard.LOG_DIR)
+        csv_name = "20250101_120000_DEMO_agent.csv"
+        resp = client.get(f"/session/{csv_name}/actions")
+        assert resp.status_code == 200
+        assert "Action Heatmap" in resp.text
+        assert "data:image/png;base64," in resp.text
+
 
 # ---------------------------------------------------------------------------
 # TestMonitorPage
