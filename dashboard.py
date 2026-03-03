@@ -76,6 +76,7 @@ _NAV = """\
   <a href="/cross-analysis">Cross-Analysis</a>
   <a href="/parameters">Parameters</a>
   <a href="/groups">Groups</a>
+  <a href="/benchmarks">Benchmarks</a>
   <a href="/reports">Reports</a>
   <a href="/optimize">Optimize</a>
   <a href="/gdd">GDD Docs</a>
@@ -3103,6 +3104,209 @@ async def api_groups_action(request: Request):
         return RedirectResponse(url=redirect_url, status_code=303)
 
     return JSONResponse(content={"status": "ok", "action": action, "name": name})
+
+
+# ---------------------------------------------------------------------------
+# Routes: Session Benchmarks
+# ---------------------------------------------------------------------------
+
+@app.get("/benchmarks", response_class=HTMLResponse)
+async def benchmarks_page(request: Request):
+    """Benchmarks page — list, create, evaluate."""
+    from session_benchmark import ParamThreshold, SessionBenchmarkManager
+    from session_replay import SessionData
+
+    mgr = SessionBenchmarkManager(log_dir=LOG_DIR)
+    benchmarks = mgr.list_benchmarks()
+
+    show_game = request.query_params.get("game", "").strip()
+
+    body = "<h1>Session Benchmarks</h1>"
+
+    # Create benchmark form
+    body += '<div class="card"><h3>Create Benchmark</h3>'
+    body += '<form method="post" action="/api/benchmarks">'
+    body += '<input type="hidden" name="action" value="create">'
+    body += '<label>Game ID: <input type="text" name="game_id" required style="padding:6px;width:150px;"></label> '
+    body += '<label>Min Steps: <input type="number" name="min_steps" placeholder="optional" style="padding:6px;width:100px;"></label> '
+    body += '<label>Min Score: <input type="number" name="min_score" step="0.1" placeholder="optional" style="padding:6px;width:100px;"></label><br><br>'
+    body += '<label>Param Thresholds: <input type="text" name="param_thresholds" placeholder="e.g. hp >= 50, gold > 1000" style="padding:6px;width:400px;"></label> '
+    body += '<label>Description: <input type="text" name="description" placeholder="optional" style="padding:6px;width:200px;"></label> '
+    body += '<button class="btn" type="submit">Create</button>'
+    body += '</form></div>'
+
+    # Benchmark list
+    if benchmarks:
+        body += "<h2>All Benchmarks</h2>"
+        body += "<table><tr><th>Game ID</th><th>Min Steps</th><th>Min Score</th><th>Param Criteria</th><th>Description</th><th>Actions</th></tr>"
+        for b in benchmarks:
+            steps_str = str(b.min_steps) if b.min_steps is not None else "-"
+            score_str = str(b.min_score) if b.min_score is not None else "-"
+            body += (
+                f'<tr><td><a href="/benchmarks?game={b.game_id}">{b.game_id}</a></td>'
+                f'<td>{steps_str}</td><td>{score_str}</td>'
+                f'<td>{len(b.param_thresholds)}</td>'
+                f'<td>{b.description}</td>'
+                f'<td>'
+                f'<form method="post" action="/api/benchmarks" style="display:inline;">'
+                f'<input type="hidden" name="action" value="delete">'
+                f'<input type="hidden" name="game_id" value="{b.game_id}">'
+                f'<button class="btn" type="submit" style="background:#e53935;font-size:12px;padding:4px 8px;">Delete</button>'
+                f'</form></td></tr>'
+            )
+        body += "</table>"
+    else:
+        body += "<p>No benchmarks defined yet.</p>"
+
+    # Benchmark detail + evaluation results
+    if show_game:
+        try:
+            criteria = mgr.get_benchmark(show_game)
+            body += f'<h2>Benchmark: {criteria.game_id}</h2>'
+            body += '<div class="card">'
+            body += f'<p><strong>Description:</strong> {criteria.description or "(none)"}</p>'
+            if criteria.min_steps is not None:
+                body += f'<p><strong>Min Steps:</strong> {criteria.min_steps}</p>'
+            if criteria.min_score is not None:
+                body += f'<p><strong>Min Score:</strong> {criteria.min_score}</p>'
+            if criteria.param_thresholds:
+                body += '<p><strong>Parameter Thresholds:</strong></p><ul>'
+                for t in criteria.param_thresholds:
+                    body += f'<li><code>{t}</code></li>'
+                body += '</ul>'
+            body += '</div>'
+
+            # Evaluate all sessions for this game
+            results = mgr.evaluate_all(game_id=show_game)
+            if results:
+                body += '<h3>Evaluation Results</h3>'
+                body += '<table><tr><th>Session</th><th>Status</th><th>Passed</th><th>Total</th><th>Rate</th><th>Details</th></tr>'
+                for r in results:
+                    status_style = {
+                        "pass": "color:#2e7d32;font-weight:bold;",
+                        "partial": "color:#f57f17;font-weight:bold;",
+                        "fail": "color:#c62828;font-weight:bold;",
+                    }.get(r.status, "")
+                    rate_pct = f"{r.pass_rate * 100:.0f}%"
+                    detail_parts = []
+                    for d in r.details:
+                        icon = "&#10004;" if d["passed"] else "&#10008;"
+                        detail_parts.append(f'{icon} {d["criterion"]} (actual: {d["actual"]})')
+                    details_str = "<br>".join(detail_parts)
+                    body += (
+                        f'<tr><td><a href="/session/{r.csv_filename}">{r.csv_filename}</a></td>'
+                        f'<td style="{status_style}">{r.status.upper()}</td>'
+                        f'<td>{r.passed_criteria}</td><td>{r.total_criteria}</td>'
+                        f'<td>{rate_pct}</td><td style="font-size:12px;">{details_str}</td></tr>'
+                    )
+                body += '</table>'
+            else:
+                body += '<p>No sessions found for this game.</p>'
+
+        except KeyError:
+            body += f'<p>Benchmark not found: {show_game}</p>'
+
+    return _render("Benchmarks", body)
+
+
+@app.get("/api/benchmarks")
+async def api_benchmarks():
+    """Return all benchmarks as JSON."""
+    from session_benchmark import SessionBenchmarkManager
+
+    mgr = SessionBenchmarkManager(log_dir=LOG_DIR)
+    return JSONResponse(content=mgr.to_dict())
+
+
+@app.get("/api/benchmarks/{game_id}")
+async def api_benchmark_detail(game_id: str):
+    """Return benchmark + evaluation results for a game."""
+    from session_benchmark import SessionBenchmarkManager
+
+    mgr = SessionBenchmarkManager(log_dir=LOG_DIR)
+    try:
+        criteria = mgr.get_benchmark(game_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Benchmark not found: {game_id}")
+
+    results = mgr.evaluate_all(game_id=game_id)
+    return JSONResponse(content={
+        "benchmark": criteria.to_dict(),
+        "results": [r.to_dict() for r in results],
+    })
+
+
+@app.post("/api/benchmarks")
+async def api_benchmarks_action(request: Request):
+    """Handle benchmark CRUD actions via form POST or JSON."""
+    from session_benchmark import ParamThreshold, SessionBenchmarkManager
+
+    mgr = SessionBenchmarkManager(log_dir=LOG_DIR)
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        data = await request.json()
+    else:
+        form = await request.form()
+        data = dict(form)
+
+    action = data.get("action", "")
+    game_id = data.get("game_id", "").strip()
+
+    if action == "create":
+        min_steps = data.get("min_steps")
+        if min_steps is not None and str(min_steps).strip():
+            min_steps = int(min_steps)
+        else:
+            min_steps = None
+
+        min_score = data.get("min_score")
+        if min_score is not None and str(min_score).strip():
+            min_score = float(min_score)
+        else:
+            min_score = None
+
+        # Parse param thresholds from comma-separated string or list
+        param_raw = data.get("param_thresholds", "")
+        thresholds = []
+        if isinstance(param_raw, list):
+            for item in param_raw:
+                if isinstance(item, dict):
+                    thresholds.append(ParamThreshold.from_dict(item))
+                elif isinstance(item, str) and item.strip():
+                    thresholds.append(ParamThreshold.parse(item.strip()))
+        elif isinstance(param_raw, str) and param_raw.strip():
+            for part in param_raw.split(","):
+                part = part.strip()
+                if part:
+                    thresholds.append(ParamThreshold.parse(part))
+
+        description = data.get("description", "")
+        try:
+            mgr.create_benchmark(
+                game_id,
+                min_steps=min_steps,
+                min_score=min_score,
+                param_thresholds=thresholds,
+                description=description,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    elif action == "delete":
+        try:
+            mgr.delete_benchmark(game_id)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+
+    if "application/json" not in content_type:
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url="/benchmarks", status_code=303)
+
+    return JSONResponse(content={"status": "ok", "action": action, "game_id": game_id})
 
 
 # ---------------------------------------------------------------------------

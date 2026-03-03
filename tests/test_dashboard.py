@@ -1630,3 +1630,133 @@ class TestGroupsPage:
             "action": "create", "name": "Dup"
         })
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# TestBenchmarksPage
+# ---------------------------------------------------------------------------
+
+class TestBenchmarksPage:
+
+    def test_benchmarks_page_returns_200(self, client):
+        """Benchmarks page returns 200 with no benchmarks."""
+        resp = client.get("/benchmarks")
+        assert resp.status_code == 200
+        assert "Session Benchmarks" in resp.text
+
+    def test_benchmarks_page_has_create_form(self, client):
+        """Benchmarks page has a create form."""
+        resp = client.get("/benchmarks")
+        assert "Create Benchmark" in resp.text
+        assert 'name="game_id"' in resp.text
+
+    def test_benchmarks_page_no_benchmarks_message(self, client):
+        """Benchmarks page shows message when empty."""
+        resp = client.get("/benchmarks")
+        assert "No benchmarks defined" in resp.text
+
+    def test_benchmarks_nav_link(self, client):
+        """Home page has Benchmarks nav link."""
+        resp = client.get("/")
+        assert "/benchmarks" in resp.text
+
+    def test_create_benchmark_via_api(self, client):
+        """POST /api/benchmarks with action=create creates a benchmark."""
+        resp = client.post("/api/benchmarks", json={
+            "action": "create",
+            "game_id": "DEMO",
+            "min_steps": 10,
+            "min_score": 20.0,
+            "param_thresholds": "hp >= 50",
+            "description": "test",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert data["game_id"] == "DEMO"
+
+    def test_create_benchmark_shown_in_list(self, client):
+        """Created benchmark appears on page."""
+        client.post("/api/benchmarks", json={
+            "action": "create", "game_id": "VISIBLE",
+        })
+        resp = client.get("/benchmarks")
+        assert "VISIBLE" in resp.text
+
+    def test_delete_benchmark_via_api(self, client):
+        """POST /api/benchmarks with action=delete removes benchmark."""
+        client.post("/api/benchmarks", json={
+            "action": "create", "game_id": "TODEL",
+        })
+        resp = client.post("/api/benchmarks", json={
+            "action": "delete", "game_id": "TODEL",
+        })
+        assert resp.status_code == 200
+
+    def test_api_benchmarks_list(self, client):
+        """GET /api/benchmarks returns benchmark list."""
+        client.post("/api/benchmarks", json={
+            "action": "create", "game_id": "DEMO", "min_steps": 10,
+        })
+        resp = client.get("/api/benchmarks")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "benchmarks" in data
+        assert "total_benchmarks" in data
+        assert data["total_benchmarks"] >= 1
+
+    def test_api_benchmark_detail(self, client, session_csv):
+        """GET /api/benchmarks/{game_id} returns benchmark + results."""
+        client.post("/api/benchmarks", json={
+            "action": "create", "game_id": "DEMO", "min_steps": 10,
+        })
+        resp = client.get("/api/benchmarks/DEMO")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "benchmark" in data
+        assert "results" in data
+        assert data["benchmark"]["game_id"] == "DEMO"
+        assert len(data["results"]) >= 1
+
+    def test_api_benchmark_detail_404(self, client):
+        """GET /api/benchmarks/nonexistent returns 404."""
+        resp = client.get("/api/benchmarks/NOSUCHGAME")
+        assert resp.status_code == 404
+
+    def test_benchmarks_page_with_detail(self, client, session_csv):
+        """Benchmarks page with ?game= shows detail + results."""
+        client.post("/api/benchmarks", json={
+            "action": "create", "game_id": "DEMO",
+            "min_steps": 10, "param_thresholds": "money >= 0",
+        })
+        resp = client.get("/benchmarks?game=DEMO")
+        assert resp.status_code == 200
+        assert "Benchmark: DEMO" in resp.text
+        assert "Evaluation Results" in resp.text
+
+    def test_benchmarks_page_evaluation_status(self, client, session_csv):
+        """Evaluation shows PASS/FAIL/PARTIAL status."""
+        client.post("/api/benchmarks", json={
+            "action": "create", "game_id": "DEMO", "min_steps": 1,
+        })
+        resp = client.get("/benchmarks?game=DEMO")
+        assert "PASS" in resp.text
+
+    def test_create_with_param_thresholds_list(self, client):
+        """Create benchmark with param_thresholds as list of dicts."""
+        resp = client.post("/api/benchmarks", json={
+            "action": "create",
+            "game_id": "LISTTEST",
+            "param_thresholds": [
+                {"parameter": "hp", "operator": ">=", "value": 50},
+                {"parameter": "gold", "operator": ">", "value": 100},
+            ],
+        })
+        assert resp.status_code == 200
+
+    def test_delete_nonexistent_returns_404(self, client):
+        """Deleting nonexistent benchmark returns 404."""
+        resp = client.post("/api/benchmarks", json={
+            "action": "delete", "game_id": "NOPE",
+        })
+        assert resp.status_code == 404
