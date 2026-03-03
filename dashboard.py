@@ -74,6 +74,7 @@ _NAV = """\
   <a href="/compare">Compare</a>
   <a href="/session/diff">Diff</a>
   <a href="/cross-analysis">Cross-Analysis</a>
+  <a href="/reports">Reports</a>
   <a href="/optimize">Optimize</a>
   <a href="/gdd">GDD Docs</a>
   <a href="/sample/themepark">Sample: ThemePark</a>
@@ -2242,6 +2243,134 @@ async def api_notifier_test():
     )
     result = notifier.send_all([test_alert])
     return JSONResponse(content=result)
+
+
+# ---------------------------------------------------------------------------
+# Routes: Batch Reports
+# ---------------------------------------------------------------------------
+
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    """Batch report page — generate or view comprehensive analysis reports."""
+    from session_replay import SessionData
+
+    sessions = SessionData.discover_sessions(LOG_DIR)
+
+    body = "<h1>Batch Reports</h1>"
+
+    # Report generation form
+    body += '<div class="card"><h2>Generate Report</h2>'
+    body += '<form method="post" action="/api/reports/generate">'
+    body += '<label>Format: <select name="format">'
+    body += '<option value="markdown">Markdown</option>'
+    body += '<option value="json">JSON</option>'
+    body += '<option value="html">HTML</option>'
+    body += '</select></label> '
+
+    # Game filter
+    game_ids = sorted({s.game_id for s in sessions})
+    if game_ids:
+        body += '<label>Game: <select name="game">'
+        body += '<option value="">All</option>'
+        for gid in game_ids:
+            body += f'<option value="{gid}">{gid}</option>'
+        body += '</select></label> '
+
+    body += '<button class="btn" type="submit">Generate</button>'
+    body += '</form></div>'
+
+    body += f"<p>Available sessions: {len(sessions)}</p>"
+
+    # Show last generated report if it exists
+    report_path = REPORTS_DIR / "batch_report.md"
+    if report_path.exists():
+        content = report_path.read_text()
+        # Simple markdown rendering
+        rendered_lines: list[str] = []
+        for line in content.split("\n"):
+            if line.startswith("### "):
+                rendered_lines.append(f"<h3>{line[4:]}</h3>")
+            elif line.startswith("## "):
+                rendered_lines.append(f"<h2>{line[3:]}</h2>")
+            elif line.startswith("# "):
+                rendered_lines.append(f"<h1>{line[2:]}</h1>")
+            elif line.startswith("- "):
+                rendered_lines.append(f"<li>{line[2:]}</li>")
+            elif line.startswith("|"):
+                rendered_lines.append(f"<p><code>{line}</code></p>")
+            elif line.strip() == "":
+                rendered_lines.append("<br>")
+            else:
+                rendered_lines.append(f"<p>{line}</p>")
+        body += '<div class="card"><h2>Last Report</h2>'
+        body += "".join(rendered_lines)
+        body += "</div>"
+
+    return _render("Reports", body)
+
+
+@app.post("/api/reports/generate")
+async def api_reports_generate(request: Request):
+    """Generate a batch report and return it.
+
+    Accepts form data or JSON with ``format`` (markdown/json/html) and
+    optional ``game`` filter.  Saves a copy to REPORTS_DIR.
+    """
+    from batch_report import BatchReportGenerator
+    from session_replay import SessionData
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        body = await request.json()
+        fmt = body.get("format", "markdown")
+        game_filter = body.get("game") or None
+    else:
+        form = await request.form()
+        fmt = form.get("format", "markdown")
+        game_filter = form.get("game") or None
+
+    sessions = SessionData.discover_sessions(LOG_DIR, game_id=game_filter)
+    if not sessions:
+        return JSONResponse(content={"error": "No sessions found"}, status_code=404)
+
+    # Auto-detect strategy config
+    strategy_config = None
+    strat_dir = Path("config/strategies")
+    if strat_dir.is_dir():
+        files = sorted(strat_dir.glob("*.json"))
+        if files:
+            try:
+                strategy_config = _json_mod.loads(files[0].read_text())
+            except Exception:
+                pass
+
+    generator = BatchReportGenerator(sessions, strategy_config=strategy_config)
+
+    if fmt == "json":
+        output = generator.to_json()
+        ext = ".json"
+    elif fmt == "html":
+        output = generator.to_html()
+        ext = ".html"
+    else:
+        output = generator.to_markdown()
+        ext = ".md"
+
+    # Save to reports dir
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    report_path = REPORTS_DIR / f"batch_report{ext}"
+    report_path.write_text(output)
+
+    if fmt == "json":
+        return JSONResponse(content=_json_mod.loads(output))
+    elif fmt == "html":
+        return HTMLResponse(content=output)
+    else:
+        # Redirect to /reports page for form submissions
+        if "application/json" not in content_type:
+            from starlette.responses import RedirectResponse
+            return RedirectResponse(url="/reports", status_code=303)
+        return JSONResponse(content={"report": output, "saved_to": str(report_path)})
 
 
 # ---------------------------------------------------------------------------

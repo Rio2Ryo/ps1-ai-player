@@ -1207,3 +1207,89 @@ class TestSessionNotesDashboard:
         resp = client.get(f"/session/{session_csv.name}")
         assert resp.status_code == 200
         assert "Important observation here" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# TestReportsPage
+# ---------------------------------------------------------------------------
+
+class TestReportsPage:
+    def test_reports_page_returns_200(self, client):
+        """GET /reports returns 200."""
+        resp = client.get("/reports")
+        assert resp.status_code == 200
+        assert "Batch Reports" in resp.text
+
+    def test_reports_page_has_form(self, client):
+        """Reports page contains the generate form."""
+        resp = client.get("/reports")
+        assert resp.status_code == 200
+        assert "Generate Report" in resp.text
+        assert 'name="format"' in resp.text
+
+    def test_reports_page_shows_session_count(self, client, session_csv):
+        """Reports page shows available session count."""
+        resp = client.get("/reports")
+        assert resp.status_code == 200
+        assert "Available sessions: 1" in resp.text
+
+    def test_reports_nav_link(self, client):
+        """Nav bar contains Reports link."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "/reports" in resp.text
+
+    def test_api_generate_no_sessions(self, client):
+        """POST /api/reports/generate with no sessions returns 404."""
+        resp = client.post(
+            "/api/reports/generate",
+            json={"format": "json"},
+        )
+        assert resp.status_code == 404
+
+    def test_api_generate_json(self, client, two_sessions):
+        """POST /api/reports/generate with format=json returns report."""
+        resp = client.post(
+            "/api/reports/generate",
+            json={"format": "json"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "session_count" in data
+        assert data["session_count"] == 2
+        assert "cross_session" in data
+        assert "anomalies" in data
+        assert "predictions" in data
+
+    def test_api_generate_html(self, client, two_sessions):
+        """POST /api/reports/generate with format=html returns HTML."""
+        resp = client.post(
+            "/api/reports/generate",
+            json={"format": "html"},
+        )
+        assert resp.status_code == 200
+        assert "<!DOCTYPE html>" in resp.text
+        assert "Batch Analysis Report" in resp.text
+
+    def test_api_generate_markdown_json_api(self, client, two_sessions):
+        """POST /api/reports/generate with format=markdown via JSON returns report text."""
+        resp = client.post(
+            "/api/reports/generate",
+            json={"format": "markdown"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "report" in data
+        assert "Batch Analysis Report" in data["report"]
+
+    def test_reports_page_shows_last_report(self, client, two_sessions):
+        """After generating, the /reports page shows the last report."""
+        # Generate a report first
+        client.post(
+            "/api/reports/generate",
+            json={"format": "markdown"},
+        )
+        # Check the page shows it
+        resp = client.get("/reports")
+        assert resp.status_code == 200
+        assert "Last Report" in resp.text
