@@ -1,0 +1,11 @@
+{
+  "genre": "fighting",
+  "description": "Fighting games (e.g., Tekken, Street Fighter)",
+  "thresholds": [
+    {"parameter": "p1_hp", "operator": "lt", "value": 30, "target_strategy": "defensive", "priority": 10},
+    {"parameter": "p2_hp", "operator": "lt", "value": 30, "target_strategy": "aggressive", "priority": 9},
+    {"parameter": "timer", "operator": "lt", "value": 10, "target_strategy": "aggressive", "priority": 8},
+    {"parameter": "combo_hits", "operator": "gt", "value": 3, "target_strategy": "combo_focus", "priority": 7},
+    {"parameter": "p1_hp", "operator": "gt", "value": 120, "target_strategy": "aggressive", "priority": 5}
+  ]
+}

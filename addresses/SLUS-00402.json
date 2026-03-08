@@ -1,0 +1,11 @@
+{
+  "game_id": "SLUS-00402",
+  "title": "Tekken 3",
+  "parameters": {
+    "p1_hp": {"address": "0x800AFF64", "type": "int16", "description": "Player 1 HP (0-170)"},
+    "p2_hp": {"address": "0x800B0044", "type": "int16", "description": "Player 2 HP (0-170)"},
+    "round": {"address": "0x800AFE2C", "type": "int8", "description": "Current round number"},
+    "timer": {"address": "0x800AFE30", "type": "int16", "description": "Round timer (60→0)"},
+    "combo_hits": {"address": "0x800AFF74", "type": "int8", "description": "Current combo hit count"}
+  }
+}

@@ -533,6 +533,8 @@ class AdaptiveStrategyEngine:
         "action": "config/strategies/action.json",
         "sports": "config/strategies/sports.json",
         "puzzle": "config/strategies/puzzle.json",
+        "survival_horror": "config/strategies/survival_horror.json",
+        "fighting": "config/strategies/fighting.json",
     }
 
     # Default thresholds for theme park management games

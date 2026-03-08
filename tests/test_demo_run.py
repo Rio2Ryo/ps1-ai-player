@@ -81,6 +81,8 @@ def test_genre_samples_mapping() -> None:
     assert "themepark" in GENRE_SAMPLES
     assert "rpg" in GENRE_SAMPLES
     assert "action" in GENRE_SAMPLES
+    assert "survival_horror" in GENRE_SAMPLES
+    assert "fighting" in GENRE_SAMPLES
     for genre, (csv_name, gen_module) in GENRE_SAMPLES.items():
         assert csv_name.endswith(".csv"), f"{genre} csv_name should end with .csv"
         assert isinstance(gen_module, str), f"{genre} gen_module should be a string"
@@ -110,3 +112,31 @@ def test_demo_run_action_genre(tmp_path: Path) -> None:
     extensions = {p.suffix for p in files}
     assert ".json" in extensions
     assert ".md" in extensions
+
+
+def test_demo_run_survival_horror_genre(tmp_path: Path) -> None:
+    """Survival horror genre demo runs analysis + GDD + charts, skips simulation."""
+    output_dir = tmp_path / "survival_horror_out"
+    files = run_demo(frames=60, output_dir=output_dir, genre="survival_horror")
+
+    assert output_dir.exists()
+    extensions = {p.suffix for p in files}
+    assert ".json" in extensions
+    assert ".md" in extensions
+    assert ".png" in extensions
+    sim_csvs = [p for p in files if p.name == "simulation_output.csv"]
+    assert len(sim_csvs) == 0
+
+
+def test_demo_run_fighting_genre(tmp_path: Path) -> None:
+    """Fighting genre demo runs analysis + GDD + charts, skips simulation."""
+    output_dir = tmp_path / "fighting_out"
+    files = run_demo(frames=60, output_dir=output_dir, genre="fighting")
+
+    assert output_dir.exists()
+    extensions = {p.suffix for p in files}
+    assert ".json" in extensions
+    assert ".md" in extensions
+    assert ".png" in extensions
+    sim_csvs = [p for p in files if p.name == "simulation_output.csv"]
+    assert len(sim_csvs) == 0

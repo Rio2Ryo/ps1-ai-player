@@ -238,6 +238,22 @@ class TestSampleAnalysis:
         assert resp.status_code == 200
         assert "Action" in resp.text
 
+    def test_sample_survival_horror(self, client):
+        sample_path = PROJECT_ROOT / "sample_data" / "survival_horror_sample_log.csv"
+        if not sample_path.exists():
+            pytest.skip("sample_data/survival_horror_sample_log.csv not found")
+        resp = client.get("/sample/survival_horror")
+        assert resp.status_code == 200
+        assert "Survival Horror" in resp.text
+
+    def test_sample_fighting(self, client):
+        sample_path = PROJECT_ROOT / "sample_data" / "fighting_sample_log.csv"
+        if not sample_path.exists():
+            pytest.skip("sample_data/fighting_sample_log.csv not found")
+        resp = client.get("/sample/fighting")
+        assert resp.status_code == 200
+        assert "Fighting" in resp.text
+
 
 # ---------------------------------------------------------------------------
 # TestJSONAPI
@@ -1760,3 +1776,884 @@ class TestBenchmarksPage:
             "action": "delete", "game_id": "NOPE",
         })
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# TestGroupComparePage
+# ---------------------------------------------------------------------------
+
+def _create_session_for_group(log_dir: Path, timestamp: str = "20250101_120000",
+                               game_id: str = "DEMO", rows: int = 30,
+                               hp_base: int = 100) -> Path:
+    """Create a session with controllable HP base for comparison tests."""
+    stem = f"{timestamp}_{game_id}_agent"
+    csv_path = log_dir / f"{stem}.csv"
+    session_path = log_dir / f"{stem}.session.json"
+    history_path = log_dir / f"{stem}.history.json"
+
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["timestamp", "step", "action", "reasoning", "observations",
+                         "hp", "gold", "score"])
+        for i in range(rows):
+            writer.writerow([
+                f"2025-01-01T12:00:{i:02d}", i, "observe", "testing", "ok",
+                hp_base - i, 50 + i * 2, 10 + i,
+            ])
+
+    session_path.write_text(json.dumps({"cost": {"total_cost_usd": 0.01}}))
+    history_path.write_text(json.dumps([]))
+    return csv_path
+
+
+class TestGroupComparePage:
+
+    def _setup_two_groups(self, client):
+        """Create two groups with sessions for comparison."""
+        log_dir = dashboard.LOG_DIR
+        # Group A sessions (high HP)
+        _create_session_for_group(log_dir, "20250101_100000", hp_base=200)
+        _create_session_for_group(log_dir, "20250101_110000", hp_base=180)
+        _create_session_for_group(log_dir, "20250101_120000", hp_base=190)
+        # Group B sessions (low HP)
+        _create_session_for_group(log_dir, "20250102_100000", hp_base=50)
+        _create_session_for_group(log_dir, "20250102_110000", hp_base=40)
+        _create_session_for_group(log_dir, "20250102_120000", hp_base=45)
+
+        client.post("/api/groups", json={"action": "create", "name": "GroupA"})
+        client.post("/api/groups", json={
+            "action": "add", "name": "GroupA",
+            "csv_filename": "20250101_100000_DEMO_agent.csv",
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "GroupA",
+            "csv_filename": "20250101_110000_DEMO_agent.csv",
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "GroupA",
+            "csv_filename": "20250101_120000_DEMO_agent.csv",
+        })
+        client.post("/api/groups", json={"action": "create", "name": "GroupB"})
+        client.post("/api/groups", json={
+            "action": "add", "name": "GroupB",
+            "csv_filename": "20250102_100000_DEMO_agent.csv",
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "GroupB",
+            "csv_filename": "20250102_110000_DEMO_agent.csv",
+        })
+        client.post("/api/groups", json={
+            "action": "add", "name": "GroupB",
+            "csv_filename": "20250102_120000_DEMO_agent.csv",
+        })
+
+    def test_compare_page_returns_200(self, client):
+        """Compare page returns 200 with no query params."""
+        resp = client.get("/groups/compare")
+        assert resp.status_code == 200
+        assert "Group Comparison" in resp.text
+
+    def test_compare_page_has_selector(self, client):
+        """Compare page has group selector form."""
+        resp = client.get("/groups/compare")
+        assert "Select Groups" in resp.text
+        assert 'name="a"' in resp.text
+        assert 'name="b"' in resp.text
+
+    def test_compare_page_no_selection(self, client):
+        """Compare page without selection shows prompt."""
+        client.post("/api/groups", json={"action": "create", "name": "G1"})
+        resp = client.get("/groups/compare")
+        assert "Select two groups" in resp.text
+
+    def test_compare_page_same_group(self, client):
+        """Selecting same group shows error message."""
+        client.post("/api/groups", json={"action": "create", "name": "G1"})
+        resp = client.get("/groups/compare?a=G1&b=G1")
+        assert "different" in resp.text
+
+    def test_compare_page_shows_results(self, client):
+        """Compare page shows comparison results with charts."""
+        self._setup_two_groups(client)
+        resp = client.get("/groups/compare?a=GroupA&b=GroupB")
+        assert resp.status_code == 200
+        assert "GroupA" in resp.text
+        assert "GroupB" in resp.text
+        assert "Parameter Comparison" in resp.text
+        assert "t-stat" in resp.text
+
+    def test_compare_page_shows_charts(self, client):
+        """Compare page includes chart images."""
+        self._setup_two_groups(client)
+        resp = client.get("/groups/compare?a=GroupA&b=GroupB")
+        assert "data:image/png;base64" in resp.text
+        assert "Bar Chart" in resp.text
+        assert "Box Plots" in resp.text
+
+    def test_compare_page_shows_significance(self, client):
+        """Compare page shows significance indicators."""
+        self._setup_two_groups(client)
+        resp = client.get("/groups/compare?a=GroupA&b=GroupB")
+        assert "YES" in resp.text or "no" in resp.text
+
+    def test_api_groups_compare(self, client):
+        """GET /api/groups/compare returns comparison JSON."""
+        self._setup_two_groups(client)
+        resp = client.get("/api/groups/compare?a=GroupA&b=GroupB")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "param_comparison" in data
+        assert "score_diff" in data
+        assert "summary_text" in data
+        assert data["group_a"]["name"] == "GroupA"
+        assert data["group_b"]["name"] == "GroupB"
+
+    def test_api_groups_compare_missing_params(self, client):
+        """GET /api/groups/compare without params returns 400."""
+        resp = client.get("/api/groups/compare")
+        assert resp.status_code == 400
+
+    def test_api_groups_compare_404(self, client):
+        """GET /api/groups/compare with nonexistent group returns 404."""
+        client.post("/api/groups", json={"action": "create", "name": "Exists"})
+        resp = client.get("/api/groups/compare?a=Exists&b=NoSuch")
+        assert resp.status_code == 404
+
+    def test_groups_page_has_compare_link(self, client):
+        """Groups page has a link to compare page."""
+        resp = client.get("/groups")
+        assert "/groups/compare" in resp.text
+        assert "Compare Groups" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# TestAutoTagsPage
+# ---------------------------------------------------------------------------
+
+class TestAutoTagsPage:
+
+    def test_auto_tags_page_returns_200(self, client):
+        """Auto-tags page returns 200."""
+        resp = client.get("/auto-tags")
+        assert resp.status_code == 200
+        assert "Auto-Tag Rules" in resp.text
+
+    def test_auto_tags_page_has_add_form(self, client):
+        """Auto-tags page has an add rule form."""
+        resp = client.get("/auto-tags")
+        assert "Add Rule" in resp.text
+        assert 'name="tag"' in resp.text
+        assert 'name="operator"' in resp.text
+
+    def test_auto_tags_page_shows_default_rules(self, client):
+        """Auto-tags page shows default rules."""
+        resp = client.get("/auto-tags")
+        assert "top_performer" in resp.text
+        assert "death_run" in resp.text
+        assert "long_session" in resp.text
+
+    def test_auto_tags_nav_link(self, client):
+        """Home page has Auto-Tags nav link."""
+        resp = client.get("/")
+        assert "/auto-tags" in resp.text
+
+    def test_api_rules_get(self, client):
+        """GET /api/auto-tags/rules returns rules JSON."""
+        resp = client.get("/api/auto-tags/rules")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "rules" in data
+        assert "total_rules" in data
+        assert data["total_rules"] >= 1
+
+    def test_api_add_rule(self, client):
+        """POST /api/auto-tags/rules with action=add creates a rule."""
+        resp = client.post("/api/auto-tags/rules", json={
+            "action": "add",
+            "tag": "test_rule",
+            "field": "steps",
+            "operator": ">",
+            "value": 50,
+            "description": "test",
+        })
+        assert resp.status_code == 200
+        # Verify it was added
+        rules = client.get("/api/auto-tags/rules").json()
+        tags = [r["tag"] for r in rules["rules"]]
+        assert "test_rule" in tags
+
+    def test_api_remove_rule(self, client):
+        """POST /api/auto-tags/rules with action=remove removes a rule."""
+        client.post("/api/auto-tags/rules", json={
+            "action": "add", "tag": "removeme",
+            "field": "steps", "operator": ">", "value": 1,
+        })
+        resp = client.post("/api/auto-tags/rules", json={
+            "action": "remove", "tag": "removeme",
+        })
+        assert resp.status_code == 200
+
+    def test_api_remove_nonexistent_returns_404(self, client):
+        """Removing nonexistent rule returns 404."""
+        resp = client.post("/api/auto-tags/rules", json={
+            "action": "remove", "tag": "nosuchrule",
+        })
+        assert resp.status_code == 404
+
+    def test_api_reset_defaults(self, client):
+        """POST /api/auto-tags/rules with action=reset resets to defaults."""
+        # Add a custom rule first
+        client.post("/api/auto-tags/rules", json={
+            "action": "add", "tag": "custom",
+            "field": "steps", "operator": ">", "value": 1,
+        })
+        resp = client.post("/api/auto-tags/rules", json={
+            "action": "reset",
+        })
+        assert resp.status_code == 200
+        rules = client.get("/api/auto-tags/rules").json()
+        tags = [r["tag"] for r in rules["rules"]]
+        assert "custom" not in tags
+        assert "top_performer" in tags
+
+    def test_api_evaluate(self, client, session_csv):
+        """GET /api/auto-tags/evaluate returns evaluation results."""
+        resp = client.get("/api/auto-tags/evaluate")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert "csv_filename" in data[0]
+        assert "tags_matched" in data[0]
+
+    def test_auto_tags_page_evaluate_all(self, client, session_csv):
+        """Auto-tags page with ?evaluate=all shows results."""
+        resp = client.get("/auto-tags?evaluate=all")
+        assert resp.status_code == 200
+        assert "Evaluation Results" in resp.text
+
+    def test_api_apply_all(self, client, session_csv):
+        """POST /api/auto-tags/rules with action=apply-all applies tags."""
+        resp = client.post("/api/auto-tags/rules", json={
+            "action": "apply-all",
+        })
+        assert resp.status_code == 200
+
+    def test_api_add_missing_fields_returns_400(self, client):
+        """Adding rule with missing fields returns 400."""
+        resp = client.post("/api/auto-tags/rules", json={
+            "action": "add", "tag": "incomplete",
+        })
+        assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# TestABTestPage
+# ---------------------------------------------------------------------------
+
+class TestABTestPage:
+
+    def _setup_two_groups(self, client):
+        """Create two groups with sessions for A/B testing."""
+        log_dir = dashboard.LOG_DIR
+        _create_session_for_group(log_dir, "20250201_100000", hp_base=200)
+        _create_session_for_group(log_dir, "20250201_110000", hp_base=180)
+        _create_session_for_group(log_dir, "20250201_120000", hp_base=190)
+        _create_session_for_group(log_dir, "20250202_100000", hp_base=50)
+        _create_session_for_group(log_dir, "20250202_110000", hp_base=40)
+        _create_session_for_group(log_dir, "20250202_120000", hp_base=45)
+
+        client.post("/api/groups", json={"action": "create", "name": "ABGroupA"})
+        for ts in ["20250201_100000", "20250201_110000", "20250201_120000"]:
+            client.post("/api/groups", json={
+                "action": "add", "name": "ABGroupA",
+                "csv_filename": f"{ts}_DEMO_agent.csv",
+            })
+        client.post("/api/groups", json={"action": "create", "name": "ABGroupB"})
+        for ts in ["20250202_100000", "20250202_110000", "20250202_120000"]:
+            client.post("/api/groups", json={
+                "action": "add", "name": "ABGroupB",
+                "csv_filename": f"{ts}_DEMO_agent.csv",
+            })
+
+    def test_ab_test_page_returns_200(self, client):
+        """A/B test page returns 200."""
+        resp = client.get("/ab-test")
+        assert resp.status_code == 200
+        assert "A/B Test" in resp.text
+
+    def test_ab_test_page_has_form(self, client):
+        """A/B test page has configuration form."""
+        resp = client.get("/ab-test")
+        assert 'name="a"' in resp.text
+        assert 'name="b"' in resp.text
+        assert 'name="alpha"' in resp.text
+
+    def test_ab_test_nav_link(self, client):
+        """Home page has A/B Test nav link."""
+        resp = client.get("/")
+        assert "/ab-test" in resp.text
+
+    def test_ab_test_no_selection(self, client):
+        """A/B test page without selection shows prompt."""
+        client.post("/api/groups", json={"action": "create", "name": "ABG1"})
+        resp = client.get("/ab-test")
+        assert "Select two groups" in resp.text
+
+    def test_ab_test_same_group(self, client):
+        """Selecting same group shows error."""
+        client.post("/api/groups", json={"action": "create", "name": "ABG2"})
+        resp = client.get("/ab-test?a=ABG2&b=ABG2")
+        assert "different" in resp.text
+
+    def test_ab_test_shows_results(self, client):
+        """A/B test page shows test results."""
+        self._setup_two_groups(client)
+        resp = client.get("/ab-test?a=ABGroupA&b=ABGroupB")
+        assert resp.status_code == 200
+        assert "ABGroupA" in resp.text
+        assert "ABGroupB" in resp.text
+        assert "Score Comparison" in resp.text
+        assert "Parameter Comparisons" in resp.text
+
+    def test_ab_test_shows_effect_size(self, client):
+        """A/B test page shows Cohen's d and effect size."""
+        self._setup_two_groups(client)
+        resp = client.get("/ab-test?a=ABGroupA&b=ABGroupB")
+        assert "Cohen" in resp.text
+
+    def test_ab_test_shows_significance(self, client):
+        """A/B test page shows significance indicators."""
+        self._setup_two_groups(client)
+        resp = client.get("/ab-test?a=ABGroupA&b=ABGroupB")
+        assert "YES" in resp.text or "no" in resp.text
+
+    def test_ab_test_shows_summary(self, client):
+        """A/B test page shows summary section."""
+        self._setup_two_groups(client)
+        resp = client.get("/ab-test?a=ABGroupA&b=ABGroupB")
+        assert "Summary" in resp.text
+
+    def test_api_ab_test(self, client):
+        """GET /api/ab-test returns A/B test results as JSON."""
+        self._setup_two_groups(client)
+        resp = client.get("/api/ab-test?a=ABGroupA&b=ABGroupB")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["group_a"] == "ABGroupA"
+        assert data["group_b"] == "ABGroupB"
+        assert "score_test" in data
+        assert "param_tests" in data
+        assert isinstance(data["param_tests"], list)
+
+    def test_api_ab_test_missing_params(self, client):
+        """GET /api/ab-test without params returns 400."""
+        resp = client.get("/api/ab-test")
+        assert resp.status_code == 400
+
+    def test_api_ab_test_nonexistent(self, client):
+        """GET /api/ab-test with nonexistent group returns 404."""
+        client.post("/api/groups", json={"action": "create", "name": "ABExists"})
+        resp = client.get("/api/ab-test?a=ABExists&b=NoSuchGroup")
+        assert resp.status_code == 404
+
+    def test_api_ab_test_with_param(self, client):
+        """GET /api/ab-test with param filter returns single param test."""
+        self._setup_two_groups(client)
+        resp = client.get("/api/ab-test?a=ABGroupA&b=ABGroupB&param=hp")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["param_tests"]) == 1
+        assert data["param_tests"][0]["metric"] == "hp"
+
+    def test_api_ab_test_with_alpha(self, client):
+        """GET /api/ab-test with custom alpha."""
+        self._setup_two_groups(client)
+        resp = client.get("/api/ab-test?a=ABGroupA&b=ABGroupB&alpha=0.01")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["alpha"] == 0.01
+
+
+# ---------------------------------------------------------------------------
+# Session Lifecycle page
+# ---------------------------------------------------------------------------
+
+class TestLifecyclePage:
+
+    def _create_sessions(self, n: int = 5):
+        """Create N sessions in the dashboard LOG_DIR."""
+        for i in range(n):
+            ts = f"2025010{i + 1}_120000"
+            _create_session(dashboard.LOG_DIR, timestamp=ts)
+
+    def test_lifecycle_page_returns_200(self, client):
+        """Lifecycle page loads without sessions."""
+        resp = client.get("/lifecycle")
+        assert resp.status_code == 200
+        assert "Lifecycle" in resp.text
+
+    def test_lifecycle_page_has_form(self, client):
+        """Lifecycle page has policy configuration form."""
+        resp = client.get("/lifecycle")
+        assert 'name="keep_latest"' in resp.text
+        assert 'name="keep_tagged"' in resp.text
+        assert 'name="keep_benchmark"' in resp.text
+
+    def test_lifecycle_nav_link(self, client):
+        """Home page has Lifecycle nav link."""
+        resp = client.get("/")
+        assert "/lifecycle" in resp.text
+
+    def test_lifecycle_page_shows_decisions(self, client):
+        """Lifecycle page shows keep/archive decisions."""
+        self._create_sessions(5)
+        resp = client.get("/lifecycle?keep_latest=3&keep_tagged=&keep_benchmark=")
+        assert resp.status_code == 200
+        assert "keep" in resp.text
+        assert "archive" in resp.text
+
+    def test_lifecycle_page_shows_summary(self, client):
+        """Lifecycle page shows session count summary."""
+        self._create_sessions(3)
+        resp = client.get("/lifecycle")
+        assert resp.status_code == 200
+        assert "Total:" in resp.text
+
+    def test_lifecycle_page_shows_disk_usage(self, client):
+        """Lifecycle page shows disk usage section."""
+        self._create_sessions(2)
+        resp = client.get("/lifecycle")
+        assert "Disk Usage" in resp.text
+        assert "MB" in resp.text
+
+    def test_lifecycle_dry_run(self, client):
+        """Lifecycle dry run shows sessions that would be archived."""
+        self._create_sessions(5)
+        resp = client.get("/lifecycle?keep_latest=2&keep_tagged=&keep_benchmark=&action=archive_dry")
+        assert resp.status_code == 200
+        assert "Would Archive" in resp.text
+
+    def test_api_lifecycle_json(self, client):
+        """GET /api/lifecycle returns valid JSON."""
+        self._create_sessions(3)
+        resp = client.get("/api/lifecycle?keep_latest=2&keep_tagged=false&keep_benchmark=false")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "policy" in data
+        assert "decisions" in data
+        assert "summary" in data
+        assert "disk_usage" in data
+        assert data["policy"]["keep_latest"] == 2
+
+    def test_api_lifecycle_default_policy(self, client):
+        """GET /api/lifecycle with defaults uses keep_latest=20."""
+        resp = client.get("/api/lifecycle")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["policy"]["keep_latest"] == 20
+
+    def test_api_lifecycle_archive_post(self, client):
+        """POST /api/lifecycle/archive redirects to lifecycle page."""
+        self._create_sessions(5)
+        resp = client.post("/api/lifecycle/archive", data={
+            "keep_latest": "3",
+            "keep_tagged": "on",
+            "keep_benchmark": "on",
+        }, follow_redirects=False)
+        assert resp.status_code == 303
+        assert "/lifecycle" in resp.headers.get("location", "")
+
+
+# ---------------------------------------------------------------------------
+# TestAnnotationsPage
+# ---------------------------------------------------------------------------
+
+class TestAnnotationsPage:
+
+    def test_annotations_page_returns_200(self, client, session_csv):
+        """Annotations page loads."""
+        csv_name = session_csv.name
+        resp = client.get(f"/session/{csv_name}/annotations")
+        assert resp.status_code == 200
+        assert "Annotations" in resp.text
+
+    def test_annotations_page_has_form(self, client, session_csv):
+        """Annotations page has the add annotation form."""
+        csv_name = session_csv.name
+        resp = client.get(f"/session/{csv_name}/annotations")
+        assert 'name="step"' in resp.text
+        assert 'name="text"' in resp.text
+        assert 'name="category"' in resp.text
+
+    def test_annotations_page_no_annotations(self, client, session_csv):
+        """Annotations page shows empty state message."""
+        csv_name = session_csv.name
+        resp = client.get(f"/session/{csv_name}/annotations")
+        assert "No annotations" in resp.text
+
+    def test_session_detail_has_annotations_link(self, client, session_csv):
+        """Session detail page has Annotations button."""
+        csv_name = session_csv.name
+        resp = client.get(f"/session/{csv_name}")
+        assert "/annotations" in resp.text
+
+    def test_api_annotations_get_empty(self, client, session_csv):
+        """GET /api/session/{name}/annotations returns empty JSON."""
+        csv_name = session_csv.name
+        resp = client.get(f"/api/session/{csv_name}/annotations")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_annotations"] == 0
+        assert data["annotations"] == []
+
+    def test_api_annotations_post_add(self, client, session_csv):
+        """POST /api/session/{name}/annotations adds annotation (JSON)."""
+        csv_name = session_csv.name
+        resp = client.post(
+            f"/api/session/{csv_name}/annotations",
+            json={"step": 5, "text": "Boss encounter", "category": "milestone"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_annotations"] == 1
+        assert data["annotations"][0]["text"] == "Boss encounter"
+
+    def test_api_annotations_post_form_redirect(self, client, session_csv):
+        """POST via form redirects to annotations page."""
+        csv_name = session_csv.name
+        resp = client.post(
+            f"/api/session/{csv_name}/annotations",
+            data={"step": "5", "text": "test note", "category": "info"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        assert "/annotations" in resp.headers.get("location", "")
+
+    def test_annotations_page_shows_annotations(self, client, session_csv):
+        """After adding annotations, they appear on the page."""
+        csv_name = session_csv.name
+        # Add via JSON API
+        client.post(
+            f"/api/session/{csv_name}/annotations",
+            json={"step": 3, "text": "HP critical", "category": "danger"},
+        )
+        resp = client.get(f"/session/{csv_name}/annotations")
+        assert resp.status_code == 200
+        assert "HP critical" in resp.text
+        assert "danger" in resp.text
+
+    def test_api_annotations_post_remove(self, client, session_csv):
+        """POST with action=remove deletes an annotation."""
+        csv_name = session_csv.name
+        # Add
+        resp = client.post(
+            f"/api/session/{csv_name}/annotations",
+            json={"step": 5, "text": "to remove"},
+        )
+        ann_id = resp.json()["annotations"][0]["id"]
+        # Remove
+        resp = client.post(
+            f"/api/session/{csv_name}/annotations",
+            json={"action": "remove", "annotation_id": ann_id},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["total_annotations"] == 0
+
+
+# ---------------------------------------------------------------------------
+# TestGoalsPage
+# ---------------------------------------------------------------------------
+
+class TestGoalsPage:
+
+    def test_goals_page_returns_200(self, client):
+        """Goals page loads without goals."""
+        resp = client.get("/goals")
+        assert resp.status_code == 200
+        assert "Goals" in resp.text
+
+    def test_goals_page_has_form(self, client):
+        """Goals page has create goal form."""
+        resp = client.get("/goals")
+        assert 'name="name"' in resp.text
+        assert 'name="game_id"' in resp.text
+        assert 'name="min_steps"' in resp.text
+
+    def test_goals_page_no_goals(self, client):
+        """Goals page shows empty state."""
+        resp = client.get("/goals")
+        assert "No goals defined" in resp.text
+
+    def test_goals_nav_link(self, client):
+        """Home page has Goals nav link."""
+        resp = client.get("/")
+        assert "/goals" in resp.text
+
+    def test_api_goals_get_empty(self, client):
+        """GET /api/goals returns empty list."""
+        resp = client.get("/api/goals")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_goals"] == 0
+
+    def test_api_goals_post_create(self, client):
+        """POST /api/goals creates a goal and redirects."""
+        resp = client.post("/api/goals", data={
+            "action": "create",
+            "name": "survive",
+            "game_id": "DEMO",
+            "min_steps": "10",
+            "description": "Stay alive",
+        }, follow_redirects=False)
+        assert resp.status_code == 303
+        assert "/goals" in resp.headers.get("location", "")
+
+    def test_goals_page_shows_goals(self, client):
+        """After creating a goal, it appears on the page."""
+        client.post("/api/goals", data={
+            "action": "create",
+            "name": "survive",
+            "game_id": "DEMO",
+            "min_steps": "10",
+        }, follow_redirects=True)
+        resp = client.get("/goals")
+        assert "survive" in resp.text
+        assert "DEMO" in resp.text
+
+    def test_api_goals_post_delete(self, client):
+        """POST /api/goals with action=delete removes a goal."""
+        client.post("/api/goals", data={
+            "action": "create",
+            "name": "to_delete",
+            "game_id": "DEMO",
+        }, follow_redirects=True)
+        resp = client.post("/api/goals", data={
+            "action": "delete",
+            "name": "to_delete",
+        }, follow_redirects=False)
+        assert resp.status_code == 303
+
+    def test_goals_page_evaluation(self, client, session_csv):
+        """Goals page with game filter shows evaluation results."""
+        client.post("/api/goals", data={
+            "action": "create",
+            "name": "step_check",
+            "game_id": "DEMO",
+            "min_steps": "10",
+        }, follow_redirects=True)
+        resp = client.get("/goals?game=DEMO")
+        assert resp.status_code == 200
+        assert "step_check" in resp.text
+
+    def test_api_goals_game_filter(self, client, session_csv):
+        """GET /api/goals?game=DEMO filters goals and includes evaluation."""
+        client.post("/api/goals", data={
+            "action": "create",
+            "name": "demo_goal",
+            "game_id": "DEMO",
+            "min_steps": "5",
+        }, follow_redirects=True)
+        resp = client.get("/api/goals?game=DEMO")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["game_filter"] == "DEMO"
+        assert "evaluation" in data
+        assert "progress" in data
+
+
+# ---------------------------------------------------------------------------
+# TestOverview
+# ---------------------------------------------------------------------------
+
+class TestOverview:
+
+    def test_home_has_overview_section(self, client):
+        """Home page shows overview cards section."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "overview-cards" in resp.text
+        assert "Overview" in resp.text
+
+    def test_home_overview_total_sessions(self, client, session_csv):
+        """Overview shows total sessions count."""
+        resp = client.get("/")
+        assert "Total Sessions" in resp.text
+
+    def test_home_overview_avg_score(self, client, session_csv):
+        """Overview shows average score cards."""
+        resp = client.get("/")
+        assert "Avg Score" in resp.text
+
+    def test_home_overview_top_strategy(self, client):
+        """Overview shows top strategy card."""
+        resp = client.get("/")
+        assert "Top Strategy" in resp.text
+
+    def test_home_overview_anomalies(self, client):
+        """Overview shows anomaly count card."""
+        resp = client.get("/")
+        assert "Anomalies" in resp.text
+
+    def test_home_overview_benchmark_pass(self, client):
+        """Overview shows benchmark pass rate card."""
+        resp = client.get("/")
+        assert "Benchmark Pass" in resp.text
+
+    def test_home_overview_disk_usage(self, client):
+        """Overview shows disk usage card."""
+        resp = client.get("/")
+        assert "Disk (MB)" in resp.text
+
+    def test_api_overview_returns_200(self, client):
+        """GET /api/overview returns valid JSON."""
+        resp = client.get("/api/overview")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total_sessions" in data
+        assert "avg_score_all" in data
+        assert "avg_score_recent" in data
+        assert "top_strategy" in data
+        assert "anomaly_count" in data
+        assert "benchmark_pass_rate" in data
+        assert "disk_usage_mb" in data
+        assert "recent_scores" in data
+
+    def test_api_overview_with_sessions(self, client, session_csv):
+        """GET /api/overview with sessions returns non-zero totals."""
+        resp = client.get("/api/overview")
+        data = resp.json()
+        assert data["total_sessions"] >= 1
+        assert isinstance(data["recent_scores"], list)
+
+    def test_home_overview_sparkline(self, client):
+        """Overview shows score trend sparkline when enough sessions."""
+        # Create multiple sessions for sparkline
+        for i in range(3):
+            ts = f"2025010{i + 1}_120000"
+            _create_session(dashboard.LOG_DIR, timestamp=ts)
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "Score Trend" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# TestStrategyHistory
+# ---------------------------------------------------------------------------
+
+def _create_session_with_strategy(log_dir: Path, timestamp: str = "20250101_120000",
+                                  game_id: str = "DEMO", rows: int = 30,
+                                  strategy_current: str = "balanced",
+                                  strategy_switches: list | None = None) -> Path:
+    """Create a session with strategy data for strategy history tests."""
+    stem = f"{timestamp}_{game_id}_agent"
+    csv_path = log_dir / f"{stem}.csv"
+    session_path = log_dir / f"{stem}.session.json"
+    history_path = log_dir / f"{stem}.history.json"
+
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["timestamp", "step", "action", "reasoning", "observations",
+                         "hp", "gold"])
+        for i in range(rows):
+            writer.writerow([
+                f"2025-01-01T12:00:{i:02d}", i, "observe", "testing", "ok",
+                100 - i, 50 + i * 10,
+            ])
+
+    session_info = {
+        "cost": {"total_cost_usd": 0.05},
+        "strategy": {"current": strategy_current, "switch_count": 0},
+    }
+    if strategy_switches is not None:
+        session_info["strategy_switches"] = strategy_switches
+    session_path.write_text(json.dumps(session_info))
+    history_path.write_text(json.dumps([{"action": "observe"}]))
+    return csv_path
+
+
+class TestStrategyHistory:
+    def test_strategy_history_page_returns_200(self, client):
+        """GET /strategy-history returns 200 even without sessions."""
+        resp = client.get("/strategy-history")
+        assert resp.status_code == 200
+        assert "Strategy History" in resp.text
+
+    def test_strategy_history_page_no_sessions(self, client):
+        """Shows 'no sessions' message when empty."""
+        resp = client.get("/strategy-history")
+        assert "No sessions found" in resp.text
+
+    def test_strategy_history_page_with_sessions(self, client):
+        """Shows usage distribution table with sessions."""
+        _create_session_with_strategy(dashboard.LOG_DIR, "20250101_120000",
+                                      strategy_current="balanced")
+        resp = client.get("/strategy-history")
+        assert resp.status_code == 200
+        assert "Usage Distribution" in resp.text
+        assert "balanced" in resp.text
+
+    def test_strategy_history_nav_link(self, client):
+        """Nav bar contains Strategy History link."""
+        resp = client.get("/")
+        assert "Strategy History" in resp.text
+        assert "/strategy-history" in resp.text
+
+    def test_strategy_history_with_switches(self, client):
+        """Page shows transition matrix when switches exist."""
+        switches = [
+            {"step": 10, "from": "balanced", "to": "aggressive", "trigger": "hp lt 50"},
+        ]
+        _create_session_with_strategy(dashboard.LOG_DIR, "20250101_120000",
+                                      strategy_current="aggressive",
+                                      strategy_switches=switches)
+        resp = client.get("/strategy-history")
+        assert resp.status_code == 200
+        assert "Transition Matrix" in resp.text
+
+    def test_strategy_history_optimal(self, client):
+        """Page shows optimal strategy table."""
+        _create_session_with_strategy(dashboard.LOG_DIR, "20250101_120000",
+                                      strategy_current="balanced")
+        resp = client.get("/strategy-history")
+        assert "Optimal Strategy" in resp.text
+
+    def test_strategy_history_game_filter(self, client):
+        """Game filter form appears with sessions."""
+        _create_session_with_strategy(dashboard.LOG_DIR, "20250101_120000",
+                                      game_id="RPG", strategy_current="balanced")
+        resp = client.get("/strategy-history")
+        assert "RPG" in resp.text
+
+    def test_api_strategy_history_empty(self, client):
+        """GET /api/strategy-history returns error when no sessions."""
+        resp = client.get("/api/strategy-history")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_count"] == 0
+
+    def test_api_strategy_history_with_sessions(self, client):
+        """GET /api/strategy-history returns valid JSON data."""
+        _create_session_with_strategy(dashboard.LOG_DIR, "20250101_120000",
+                                      strategy_current="balanced")
+        resp = client.get("/api/strategy-history")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_count"] == 1
+        assert "usage_distribution" in data
+        assert "effectiveness_trend" in data
+        assert "transition_matrix" in data
+        assert "optimal_strategy" in data
+
+    def test_api_strategy_history_with_switches(self, client):
+        """JSON API includes transition data when switches exist."""
+        switches = [
+            {"step": 10, "from": "balanced", "to": "aggressive", "trigger": "hp lt 50"},
+        ]
+        _create_session_with_strategy(dashboard.LOG_DIR, "20250101_120000",
+                                      strategy_current="aggressive",
+                                      strategy_switches=switches)
+        resp = client.get("/api/strategy-history")
+        data = resp.json()
+        assert data["usage_distribution"]["balanced"] == 10
+        assert data["usage_distribution"]["aggressive"] == 20

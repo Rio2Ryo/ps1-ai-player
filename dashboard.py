@@ -77,12 +77,19 @@ _NAV = """\
   <a href="/parameters">Parameters</a>
   <a href="/groups">Groups</a>
   <a href="/benchmarks">Benchmarks</a>
+  <a href="/auto-tags">Auto-Tags</a>
+  <a href="/ab-test">A/B Test</a>
+  <a href="/lifecycle">Lifecycle</a>
+  <a href="/goals">Goals</a>
+  <a href="/strategy-history">Strategy History</a>
   <a href="/reports">Reports</a>
   <a href="/optimize">Optimize</a>
   <a href="/gdd">GDD Docs</a>
   <a href="/sample/themepark">Sample: ThemePark</a>
   <a href="/sample/rpg">Sample: RPG</a>
   <a href="/sample/action">Sample: Action</a>
+  <a href="/sample/survival_horror">Sample: Survival Horror</a>
+  <a href="/sample/fighting">Sample: Fighting</a>
 </nav>
 """
 
@@ -433,6 +440,161 @@ def _load_session(csv_filename: str):
 
 
 # ---------------------------------------------------------------------------
+# Overview data collection
+# ---------------------------------------------------------------------------
+
+def _collect_overview(sessions, scorer) -> dict[str, Any]:
+    """Collect aggregate overview stats for the home page and /api/overview."""
+    total_sessions = len(sessions)
+    if not sessions:
+        return {
+            "total_sessions": 0,
+            "avg_score_all": 0.0,
+            "avg_score_recent": 0.0,
+            "top_strategy": "N/A",
+            "anomaly_count": 0,
+            "benchmark_pass_rate": 0.0,
+            "disk_usage_mb": 0.0,
+            "recent_scores": [],
+        }
+
+    # Score all sessions
+    scores = [(s, scorer.score(s).total) for s in sessions]
+    all_scores = [sc for _, sc in scores]
+    avg_score_all = sum(all_scores) / len(all_scores) if all_scores else 0.0
+
+    # Recent 10 scores
+    sorted_by_ts = sorted(sessions, key=lambda s: s.timestamp, reverse=True)
+    recent_10 = sorted_by_ts[:10]
+    recent_scores_vals = [scorer.score(s).total for s in recent_10]
+    avg_score_recent = (
+        sum(recent_scores_vals) / len(recent_scores_vals) if recent_scores_vals else 0.0
+    )
+
+    # Recent 20 for sparkline (oldest first for chart)
+    recent_20 = sorted_by_ts[:20][::-1]
+    recent_scores = [round(scorer.score(s).total, 1) for s in recent_20]
+
+    # Top strategy
+    strategy_counts: dict[str, int] = {}
+    for s in sessions:
+        strat = s.session_info.get("strategy", {})
+        mode = strat.get("mode", "") if isinstance(strat, dict) else ""
+        if mode:
+            strategy_counts[mode] = strategy_counts.get(mode, 0) + 1
+    top_strategy = max(strategy_counts, key=strategy_counts.get) if strategy_counts else "N/A"
+
+    # Anomaly count
+    anomaly_count = 0
+    try:
+        from anomaly_detector import AnomalyDetector
+        if sessions:
+            detector = AnomalyDetector(sessions)
+            anomalies = detector.detect_all()
+            anomaly_count = len(anomalies)
+    except Exception:
+        pass
+
+    # Benchmark pass rate
+    benchmark_pass_rate = 0.0
+    try:
+        from session_benchmark import SessionBenchmarkManager
+        bmgr = SessionBenchmarkManager(log_dir=LOG_DIR)
+        benchmarks = bmgr.list_benchmarks()
+        if benchmarks:
+            results = bmgr.evaluate_all()
+            if results:
+                passed = sum(1 for r in results if r.status == "pass")
+                benchmark_pass_rate = passed / len(results) * 100
+    except Exception:
+        pass
+
+    # Disk usage
+    disk_usage_mb = 0.0
+    try:
+        from session_lifecycle import SessionLifecycleManager
+        lmgr = SessionLifecycleManager(log_dir=LOG_DIR)
+        usage = lmgr.disk_usage()
+        disk_usage_mb = usage.total_bytes / (1024 * 1024)
+    except Exception:
+        pass
+
+    return {
+        "total_sessions": total_sessions,
+        "avg_score_all": round(avg_score_all, 1),
+        "avg_score_recent": round(avg_score_recent, 1),
+        "top_strategy": top_strategy,
+        "anomaly_count": anomaly_count,
+        "benchmark_pass_rate": round(benchmark_pass_rate, 1),
+        "disk_usage_mb": round(disk_usage_mb, 2),
+        "recent_scores": recent_scores,
+    }
+
+
+def _render_overview_cards(overview: dict[str, Any]) -> str:
+    """Render the overview card section as HTML."""
+    score_trend = ""
+    if overview["avg_score_recent"] > overview["avg_score_all"] + 1:
+        score_trend = '<span style="color:#2e7d32">&#9650;</span>'
+    elif overview["avg_score_recent"] < overview["avg_score_all"] - 1:
+        score_trend = '<span style="color:#c62828">&#9660;</span>'
+    else:
+        score_trend = '<span style="color:#888">&#9644;</span>'
+
+    # Sparkline SVG for recent scores
+    sparkline = ""
+    scores = overview["recent_scores"]
+    if len(scores) >= 2:
+        min_s = min(scores)
+        max_s = max(scores)
+        range_s = max_s - min_s if max_s != min_s else 1
+        w, h = 200, 40
+        points = []
+        for i, s in enumerate(scores):
+            x = i / (len(scores) - 1) * w
+            y = h - ((s - min_s) / range_s) * h
+            points.append(f"{x:.1f},{y:.1f}")
+        polyline = " ".join(points)
+        sparkline = (
+            f'<svg width="{w}" height="{h}" style="vertical-align:middle;">'
+            f'<polyline points="{polyline}" fill="none" stroke="#1565c0" stroke-width="2"/>'
+            f'</svg>'
+        )
+
+    card_style = (
+        'style="display:inline-block;background:#fff;border-radius:6px;padding:16px 20px;'
+        'margin:4px;box-shadow:0 1px 3px rgba(0,0,0,0.12);min-width:140px;text-align:center;"'
+    )
+
+    html = '<div class="card" id="overview-cards"><h2>Overview</h2>'
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;">'
+
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:#1565c0">{overview["total_sessions"]}</div><div style="font-size:12px;color:#666">Total Sessions</div></div>'
+
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:#1565c0">{overview["avg_score_recent"]}</div><div style="font-size:12px;color:#666">Avg Score (Recent 10) {score_trend}</div></div>'
+
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:#1565c0">{overview["avg_score_all"]}</div><div style="font-size:12px;color:#666">Avg Score (All)</div></div>'
+
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:#1565c0">{overview["top_strategy"]}</div><div style="font-size:12px;color:#666">Top Strategy</div></div>'
+
+    anomaly_color = "#c62828" if overview["anomaly_count"] > 0 else "#2e7d32"
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:{anomaly_color}">{overview["anomaly_count"]}</div><div style="font-size:12px;color:#666">Anomalies</div></div>'
+
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:#1565c0">{overview["benchmark_pass_rate"]}%</div><div style="font-size:12px;color:#666">Benchmark Pass</div></div>'
+
+    html += f'<div {card_style}><div style="font-size:24px;font-weight:bold;color:#1565c0">{overview["disk_usage_mb"]}</div><div style="font-size:12px;color:#666">Disk (MB)</div></div>'
+
+    html += '</div>'
+
+    # Sparkline
+    if sparkline:
+        html += f'<div style="margin-top:8px"><strong>Score Trend (Recent 20):</strong> {sparkline}</div>'
+
+    html += '</div>'
+    return html
+
+
+# ---------------------------------------------------------------------------
 # Routes: HTML pages
 # ---------------------------------------------------------------------------
 
@@ -447,6 +609,12 @@ async def home(request: Request):
     tagger = SessionTagger(log_dir=LOG_DIR)
     scorer = SessionScorer()
 
+    # Overview cards (before filtering)
+    overview = _collect_overview(sessions, scorer)
+    body = _render_overview_cards(overview)
+
+    body += "<h1>Sessions</h1>"
+
     # Tag filter
     tag_filter = request.query_params.get("tag")
     if tag_filter:
@@ -454,8 +622,6 @@ async def home(request: Request):
         sessions = [s for s in sessions if s.csv_path.name in filtered_names]
 
     all_tags = tagger.all_known_tags()
-
-    body = "<h1>Sessions</h1>"
 
     # Tag filter dropdown
     if all_tags:
@@ -564,7 +730,9 @@ async def home(request: Request):
         '<div class="card"><h3>Sample Data</h3>'
         '<a class="btn" href="/sample/themepark">ThemePark</a> '
         '<a class="btn" href="/sample/rpg">RPG</a> '
-        '<a class="btn" href="/sample/action">Action</a></div>'
+        '<a class="btn" href="/sample/action">Action</a> '
+        '<a class="btn" href="/sample/survival_horror">Survival Horror</a> '
+        '<a class="btn" href="/sample/fighting">Fighting</a></div>'
     )
 
     return _render("Home", body)
@@ -811,6 +979,7 @@ async def session_detail(csv_filename: str):
         f'<a class="btn" href="/session/{csv_filename}/actions">Action Analysis</a> '
         f'<a class="btn" href="/session/{csv_filename}/predict">Predict</a> '
         f'<a class="btn" href="/session/{csv_filename}/recommend">Recommend</a> '
+        f'<a class="btn" href="/session/{csv_filename}/annotations">Annotations</a> '
         f'<a class="btn" href="/session/{csv_filename}/export">Download ZIP</a>'
     )
 
@@ -1700,10 +1869,12 @@ async def sample_analysis(genre: str):
         "themepark": "sample_data/sample_log.csv",
         "rpg": "sample_data/rpg_sample_log.csv",
         "action": "sample_data/action_sample_log.csv",
+        "survival_horror": "sample_data/survival_horror_sample_log.csv",
+        "fighting": "sample_data/fighting_sample_log.csv",
     }
 
     if genre not in sample_map:
-        raise HTTPException(status_code=404, detail=f"Unknown genre: {genre}. Use: themepark, rpg, action")
+        raise HTTPException(status_code=404, detail=f"Unknown genre: {genre}. Use: {', '.join(sample_map)}")
 
     csv_path = Path(sample_map[genre])
     if not csv_path.exists():
@@ -2115,6 +2286,18 @@ async def api_post_notes(csv_filename: str, request: Request):
 # ---------------------------------------------------------------------------
 # Routes: JSON API
 # ---------------------------------------------------------------------------
+
+@app.get("/api/overview")
+async def api_overview():
+    """JSON API: dashboard overview stats."""
+    from session_replay import SessionData
+    from session_scorer import SessionScorer
+
+    sessions = SessionData.discover_sessions(LOG_DIR)
+    scorer = SessionScorer()
+    overview = _collect_overview(sessions, scorer)
+    return JSONResponse(content=overview)
+
 
 @app.get("/api/sessions")
 async def api_sessions():
@@ -2919,7 +3102,8 @@ async def groups_page(request: Request):
     # Check if viewing a specific group
     show_group = request.query_params.get("name", "").strip()
 
-    body = "<h1>Session Groups</h1>"
+    body = '<h1>Session Groups</h1>'
+    body += '<p><a class="btn" href="/groups/compare">Compare Groups</a></p>'
 
     # Create group form
     body += '<div class="card"><h3>Create Group</h3>'
@@ -3037,6 +3221,26 @@ async def api_groups():
     return JSONResponse(content=mgr.to_dict())
 
 
+@app.get("/api/groups/compare")
+async def api_groups_compare(request: Request):
+    """Return comparison data for two groups as JSON."""
+    from session_group import SessionGroupManager
+
+    group_a = request.query_params.get("a", "").strip()
+    group_b = request.query_params.get("b", "").strip()
+
+    if not group_a or not group_b:
+        raise HTTPException(status_code=400, detail="Both 'a' and 'b' query params required")
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    try:
+        comp = mgr.compare_groups(group_a, group_b)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return JSONResponse(content=comp)
+
+
 @app.get("/api/groups/{name}")
 async def api_group_stats(name: str):
     """Return stats for a specific group."""
@@ -3104,6 +3308,319 @@ async def api_groups_action(request: Request):
         return RedirectResponse(url=redirect_url, status_code=303)
 
     return JSONResponse(content={"status": "ok", "action": action, "name": name})
+
+
+# ---------------------------------------------------------------------------
+# Routes: Group Comparison
+# ---------------------------------------------------------------------------
+
+@app.get("/groups/compare", response_class=HTMLResponse)
+async def groups_compare_page(request: Request):
+    """Compare two groups: stats table, t-test results, bar + box charts."""
+    from session_group import (
+        SessionGroupManager,
+        plot_group_bar_comparison,
+        plot_group_boxplot,
+    )
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    groups = mgr.list_groups()
+
+    group_a = request.query_params.get("a", "").strip()
+    group_b = request.query_params.get("b", "").strip()
+
+    body = "<h1>Group Comparison</h1>"
+
+    # Group selector form
+    body += '<div class="card"><h3>Select Groups to Compare</h3>'
+    body += '<form method="get" action="/groups/compare">'
+    body += '<label>Group A: <select name="a" style="padding:6px;">'
+    body += '<option value="">-- select --</option>'
+    for g in groups:
+        sel_a = ' selected' if g.name == group_a else ''
+        body += f'<option value="{g.name}"{sel_a}>{g.name}</option>'
+    body += '</select></label> '
+    body += '<label>Group B: <select name="b" style="padding:6px;">'
+    body += '<option value="">-- select --</option>'
+    for g in groups:
+        sel_b = ' selected' if g.name == group_b else ''
+        body += f'<option value="{g.name}"{sel_b}>{g.name}</option>'
+    body += '</select></label> '
+    body += '<button class="btn" type="submit">Compare</button>'
+    body += '</form></div>'
+
+    if not groups:
+        body += "<p>No groups defined. <a href=\"/groups\">Create groups first.</a></p>"
+        return _render("Group Comparison", body)
+
+    if not group_a or not group_b:
+        body += "<p>Select two groups above to compare.</p>"
+        return _render("Group Comparison", body)
+
+    if group_a == group_b:
+        body += "<p>Please select two <strong>different</strong> groups.</p>"
+        return _render("Group Comparison", body)
+
+    try:
+        comp = mgr.compare_groups(group_a, group_b)
+    except KeyError as e:
+        body += f"<p>Error: {e}</p>"
+        return _render("Group Comparison", body)
+
+    # Score / steps summary
+    body += f'<h2>{group_a} vs {group_b}</h2>'
+    body += '<div class="card">'
+    if comp["score_diff"] is not None:
+        body += (f'<p><strong>Score:</strong> {group_a}={comp["score_a"]:.1f}, '
+                 f'{group_b}={comp["score_b"]:.1f} '
+                 f'(diff={comp["score_diff"]:+.1f})</p>')
+    body += (f'<p><strong>Steps:</strong> {group_a}={comp["steps_a"]:.1f}, '
+             f'{group_b}={comp["steps_b"]:.1f} '
+             f'(diff={comp["steps_diff"]:+.1f})</p>')
+    body += f'<p><strong>Summary:</strong> {comp["summary_text"]}</p>'
+    body += '</div>'
+
+    # Parameter comparison table with t-test
+    pc = comp["param_comparison"]
+    if pc:
+        body += '<h3>Parameter Comparison (t-test)</h3>'
+        body += '<table>'
+        body += (f'<tr><th>Parameter</th><th>{group_a} Mean</th>'
+                 f'<th>{group_b} Mean</th><th>Diff</th>'
+                 f'<th>t-stat</th><th>p-value</th><th>Significant?</th></tr>')
+        for p, v in pc.items():
+            t_str = f'{v["t_stat"]:.3f}' if v["t_stat"] is not None else "-"
+            p_str = f'{v["p_value"]:.4f}' if v["p_value"] is not None else "-"
+            if v["significant"]:
+                sig_str = '<span style="color:#2e7d32;font-weight:bold;">YES</span>'
+            else:
+                sig_str = '<span style="color:#888;">no</span>'
+            body += (
+                f'<tr><td>{p}</td><td>{v["mean_a"]:.2f}</td>'
+                f'<td>{v["mean_b"]:.2f}</td><td>{v["diff"]:+.2f}</td>'
+                f'<td>{t_str}</td><td>{p_str}</td><td>{sig_str}</td></tr>'
+            )
+        body += '</table>'
+
+    # Bar comparison chart
+    if pc:
+        try:
+            import tempfile as _tf
+
+            with _tf.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            try:
+                plot_group_bar_comparison(comp, tmp_path)
+                png_bytes = tmp_path.read_bytes()
+                b64 = base64.b64encode(png_bytes).decode()
+                body += '<h3>Mean Comparison (Bar Chart)</h3>'
+                body += f'<img class="chart" src="data:image/png;base64,{b64}">'
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # Box plots per parameter
+    if pc:
+        try:
+            stats_a = mgr.group_stats(group_a)
+            stats_b = mgr.group_stats(group_b)
+            body += '<h3>Parameter Distributions (Box Plots)</h3>'
+            for p in pc:
+                try:
+                    with _tf.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                        tmp_path = Path(tmp.name)
+                    try:
+                        plot_group_boxplot(stats_a, stats_b, p, tmp_path)
+                        png_bytes = tmp_path.read_bytes()
+                        b64 = base64.b64encode(png_bytes).decode()
+                        body += f'<img class="chart" src="data:image/png;base64,{b64}">'
+                    finally:
+                        tmp_path.unlink(missing_ok=True)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+    return _render("Group Comparison", body)
+
+
+# ---------------------------------------------------------------------------
+# Routes: Auto-Tags
+# ---------------------------------------------------------------------------
+
+@app.get("/auto-tags", response_class=HTMLResponse)
+async def auto_tags_page(request: Request):
+    """Auto-tag rules page — view rules, evaluate sessions, manage rules."""
+    from auto_tagger import AutoTagger
+    from session_replay import SessionData
+
+    tagger = AutoTagger(log_dir=LOG_DIR)
+    rules = tagger.get_rules()
+
+    show_eval = request.query_params.get("evaluate", "").strip()
+
+    body = "<h1>Auto-Tag Rules</h1>"
+
+    # Add rule form
+    body += '<div class="card"><h3>Add Rule</h3>'
+    body += '<form method="post" action="/api/auto-tags/rules">'
+    body += '<input type="hidden" name="action" value="add">'
+    body += '<label>Tag: <input type="text" name="tag" required style="padding:6px;width:150px;"></label> '
+    body += '<label>Field: <select name="field" style="padding:6px;">'
+    body += '<option value="steps">steps</option>'
+    body += '<option value="score">score</option>'
+    body += '<option value="score_pct">score_pct</option>'
+    body += '<option value="cost_usd">cost_usd</option>'
+    body += '<option value="duration_seconds">duration_seconds</option>'
+    body += '<option value="param:hp">param:hp</option>'
+    body += '<option value="param:gold">param:gold</option>'
+    body += '</select></label> '
+    body += '<label>or custom field: <input type="text" name="field_custom" placeholder="param:mp" style="padding:6px;width:120px;"></label> '
+    body += '<label>Operator: <select name="operator" style="padding:6px;">'
+    for op in [">", ">=", "<", "<=", "==", "!="]:
+        body += f'<option value="{op}">{op}</option>'
+    body += '</select></label> '
+    body += '<label>Value: <input type="number" name="value" step="any" required style="padding:6px;width:100px;"></label> '
+    body += '<label>Description: <input type="text" name="description" placeholder="optional" style="padding:6px;width:200px;"></label> '
+    body += '<button class="btn" type="submit">Add Rule</button>'
+    body += '</form></div>'
+
+    # Current rules table
+    if rules:
+        body += "<h2>Current Rules</h2>"
+        body += "<table><tr><th>Tag</th><th>Field</th><th>Operator</th><th>Value</th><th>Description</th><th>Actions</th></tr>"
+        for r in rules:
+            body += (
+                f'<tr><td><code>{r.tag}</code></td><td>{r.field}</td>'
+                f'<td>{r.operator}</td><td>{r.value}</td>'
+                f'<td>{r.description}</td>'
+                f'<td>'
+                f'<form method="post" action="/api/auto-tags/rules" style="display:inline;">'
+                f'<input type="hidden" name="action" value="remove">'
+                f'<input type="hidden" name="tag" value="{r.tag}">'
+                f'<button class="btn" type="submit" style="background:#e53935;font-size:12px;padding:4px 8px;">Remove</button>'
+                f'</form></td></tr>'
+            )
+        body += "</table>"
+    else:
+        body += "<p>No rules defined.</p>"
+
+    # Reset defaults button
+    body += '<div class="card" style="display:flex;gap:12px;align-items:center;">'
+    body += '<form method="post" action="/api/auto-tags/rules" style="display:inline;">'
+    body += '<input type="hidden" name="action" value="reset">'
+    body += '<button class="btn" type="submit">Reset to Defaults</button>'
+    body += '</form>'
+    body += ' <a class="btn" href="/auto-tags?evaluate=all">Evaluate All Sessions</a>'
+    body += '</div>'
+
+    # Evaluation results
+    if show_eval == "all":
+        eval_results = tagger.evaluate_all()
+        if eval_results:
+            body += '<h2>Evaluation Results</h2>'
+            body += '<table><tr><th>Session</th><th>Game</th><th>Tags Matched</th></tr>'
+            for r in eval_results:
+                tags_str = ", ".join(f'<code>{t}</code>' for t in r["tags_matched"]) if r["tags_matched"] else "<em>(none)</em>"
+                body += (
+                    f'<tr><td><a href="/session/{r["csv_filename"]}">{r["csv_filename"]}</a></td>'
+                    f'<td>{r["game_id"]}</td><td>{tags_str}</td></tr>'
+                )
+            body += '</table>'
+            body += '<form method="post" action="/api/auto-tags/rules">'
+            body += '<input type="hidden" name="action" value="apply-all">'
+            body += '<button class="btn" type="submit">Apply All Matched Tags</button>'
+            body += '</form>'
+        else:
+            body += "<p>No sessions found.</p>"
+
+    return _render("Auto-Tags", body)
+
+
+@app.get("/api/auto-tags/rules")
+async def api_auto_tag_rules():
+    """Return all auto-tag rules as JSON."""
+    from auto_tagger import AutoTagger
+
+    tagger = AutoTagger(log_dir=LOG_DIR)
+    return JSONResponse(content=tagger.to_dict())
+
+
+@app.get("/api/auto-tags/evaluate")
+async def api_auto_tag_evaluate(request: Request):
+    """Evaluate all sessions against auto-tag rules."""
+    from auto_tagger import AutoTagger
+
+    game_id = request.query_params.get("game", None)
+    apply = request.query_params.get("apply", "").lower() == "true"
+
+    tagger = AutoTagger(log_dir=LOG_DIR)
+    results = tagger.evaluate_all(game_id=game_id, apply=apply)
+    return JSONResponse(content=results)
+
+
+@app.post("/api/auto-tags/rules")
+async def api_auto_tag_rules_action(request: Request):
+    """Handle auto-tag rule CRUD actions via form POST or JSON."""
+    from auto_tagger import AutoTagger, TagRule
+
+    tagger = AutoTagger(log_dir=LOG_DIR)
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        data = await request.json()
+    else:
+        form = await request.form()
+        data = dict(form)
+
+    action = data.get("action", "")
+
+    if action == "add":
+        tag = data.get("tag", "").strip()
+        # Use custom field if provided, otherwise use select field
+        field_custom = data.get("field_custom", "").strip()
+        field_val = field_custom if field_custom else data.get("field", "").strip()
+        operator = data.get("operator", "").strip()
+        value = data.get("value")
+        description = data.get("description", "")
+        if not tag or not field_val or not operator or value is None:
+            raise HTTPException(status_code=400, detail="Missing required fields: tag, field, operator, value")
+        try:
+            rule = TagRule(
+                tag=tag,
+                field=field_val,
+                operator=operator,
+                value=float(value),
+                description=description,
+            )
+            tagger.add_rule(rule)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    elif action == "remove":
+        tag = data.get("tag", "").strip()
+        try:
+            tagger.remove_rule(tag)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    elif action == "reset":
+        tagger.reset_defaults()
+
+    elif action == "apply-all":
+        tagger.evaluate_all(apply=True)
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+
+    # For form submissions, redirect back
+    if "application/json" not in content_type:
+        from starlette.responses import RedirectResponse
+        redirect_url = "/auto-tags?evaluate=all" if action == "apply-all" else "/auto-tags"
+        return RedirectResponse(url=redirect_url, status_code=303)
+
+    return JSONResponse(content={"status": "ok", "action": action})
 
 
 # ---------------------------------------------------------------------------
@@ -3307,6 +3824,831 @@ async def api_benchmarks_action(request: Request):
         return RedirectResponse(url="/benchmarks", status_code=303)
 
     return JSONResponse(content={"status": "ok", "action": action, "game_id": game_id})
+
+
+# ---------------------------------------------------------------------------
+# Routes: A/B Test
+# ---------------------------------------------------------------------------
+
+@app.get("/ab-test", response_class=HTMLResponse)
+async def ab_test_page(request: Request):
+    """A/B test page — select two groups, run statistical comparison."""
+    from session_ab_test import ABTestRunner
+    from session_group import SessionGroupManager
+
+    mgr = SessionGroupManager(log_dir=LOG_DIR)
+    groups = mgr.list_groups()
+
+    group_a = request.query_params.get("a", "").strip()
+    group_b = request.query_params.get("b", "").strip()
+    param = request.query_params.get("param", "").strip() or None
+    alpha_str = request.query_params.get("alpha", "0.05").strip()
+    try:
+        alpha = float(alpha_str)
+    except ValueError:
+        alpha = 0.05
+
+    body = "<h1>A/B Test</h1>"
+
+    # Group selector form
+    body += '<div class="card"><h3>Configure A/B Test</h3>'
+    body += '<form method="get" action="/ab-test">'
+    body += '<label>Group A: <select name="a" style="padding:6px;">'
+    body += '<option value="">-- select --</option>'
+    for g in groups:
+        sel = ' selected' if g.name == group_a else ''
+        body += f'<option value="{g.name}"{sel}>{g.name}</option>'
+    body += '</select></label> '
+    body += '<label>Group B: <select name="b" style="padding:6px;">'
+    body += '<option value="">-- select --</option>'
+    for g in groups:
+        sel = ' selected' if g.name == group_b else ''
+        body += f'<option value="{g.name}"{sel}>{g.name}</option>'
+    body += '</select></label> '
+    body += (f'<label>Alpha: <input name="alpha" type="text" value="{alpha}" '
+             f'style="width:60px;padding:6px;"></label> ')
+    body += ('<label>Parameter: <input name="param" type="text" placeholder="all" '
+             f'value="{param or ""}" style="width:100px;padding:6px;"></label> ')
+    body += '<button class="btn" type="submit">Run Test</button>'
+    body += '</form></div>'
+
+    if not groups:
+        body += '<p>No groups defined. <a href="/groups">Create groups first.</a></p>'
+        return _render("A/B Test", body)
+
+    if not group_a or not group_b:
+        body += "<p>Select two groups above to run an A/B test.</p>"
+        return _render("A/B Test", body)
+
+    if group_a == group_b:
+        body += "<p>Please select two <strong>different</strong> groups.</p>"
+        return _render("A/B Test", body)
+
+    try:
+        runner = ABTestRunner(log_dir=LOG_DIR, alpha=alpha)
+        result = runner.run(group_a, group_b, param=param)
+    except KeyError as e:
+        body += f"<p>Error: {e}</p>"
+        return _render("A/B Test", body)
+
+    # Overview
+    body += f'<h2>{group_a} vs {group_b} (α={alpha})</h2>'
+    body += f'<p>Sessions: {group_a}={result.n_a}, {group_b}={result.n_b}</p>'
+
+    # Score comparison
+    if result.score_test is not None:
+        st = result.score_test
+        body += '<div class="card"><h3>Score Comparison</h3>'
+        body += '<table>'
+        body += (f'<tr><th></th><th>{group_a}</th><th>{group_b}</th>'
+                 f'<th>Diff</th><th>p-value (t)</th><th>Significant?</th></tr>')
+        sig_class = 'color:#2e7d32;font-weight:bold;' if st.significant_t else 'color:#888;'
+        sig_txt = 'YES' if st.significant_t else 'no'
+        t_p = f'{st.t_p_value:.4f}' if st.t_p_value is not None else '-'
+        body += (f'<tr><td>Score</td><td>{st.mean_a:.2f}</td><td>{st.mean_b:.2f}</td>'
+                 f'<td>{st.diff:+.2f}</td><td>{t_p}</td>'
+                 f'<td><span style="{sig_class}">{sig_txt}</span></td></tr>')
+        body += '</table>'
+        # Effect size + CI + Power
+        body += '<p>'
+        if st.cohens_d is not None:
+            body += f"Cohen's d: {st.cohens_d:.3f} ({st.effect_size_label})"
+        if st.ci_lower is not None and st.ci_upper is not None:
+            body += f" | CI [{st.ci_lower:.2f}, {st.ci_upper:.2f}]"
+        if st.power is not None:
+            body += f" | Power: {st.power:.3f}"
+        body += '</p></div>'
+
+    # Parameter comparison table
+    if result.param_tests:
+        body += '<div class="card"><h3>Parameter Comparisons</h3>'
+        body += '<table>'
+        body += (f'<tr><th>Parameter</th><th>{group_a} Mean</th>'
+                 f'<th>{group_b} Mean</th><th>Diff</th>'
+                 f'<th>t p-value</th><th>U p-value</th>'
+                 f"<th>Cohen's d</th><th>Effect</th>"
+                 f'<th>CI</th><th>Power</th><th>Sig (t)?</th></tr>')
+        for pt in result.param_tests:
+            t_p = f'{pt.t_p_value:.4f}' if pt.t_p_value is not None else '-'
+            u_p = f'{pt.u_p_value:.4f}' if pt.u_p_value is not None else '-'
+            cd = f'{pt.cohens_d:.3f}' if pt.cohens_d is not None else '-'
+            ci = (f'[{pt.ci_lower:.2f}, {pt.ci_upper:.2f}]'
+                  if pt.ci_lower is not None and pt.ci_upper is not None else '-')
+            pw = f'{pt.power:.3f}' if pt.power is not None else '-'
+            sig_class = 'color:#2e7d32;font-weight:bold;' if pt.significant_t else 'color:#888;'
+            sig_txt = 'YES' if pt.significant_t else 'no'
+            body += (f'<tr><td>{pt.metric}</td><td>{pt.mean_a:.2f}</td>'
+                     f'<td>{pt.mean_b:.2f}</td><td>{pt.diff:+.2f}</td>'
+                     f'<td>{t_p}</td><td>{u_p}</td>'
+                     f'<td>{cd}</td><td>{pt.effect_size_label}</td>'
+                     f'<td>{ci}</td><td>{pw}</td>'
+                     f'<td><span style="{sig_class}">{sig_txt}</span></td></tr>')
+        body += '</table></div>'
+
+    # Summary
+    if result.summary:
+        body += '<div class="card"><h3>Summary</h3>'
+        body += f'<p>{result.summary}</p></div>'
+
+    return _render("A/B Test", body)
+
+
+@app.get("/api/ab-test")
+async def api_ab_test(request: Request):
+    """Return A/B test results as JSON."""
+    from session_ab_test import ABTestRunner
+
+    group_a = request.query_params.get("a", "").strip()
+    group_b = request.query_params.get("b", "").strip()
+    if not group_a or not group_b:
+        raise HTTPException(status_code=400, detail="Both 'a' and 'b' query params required")
+
+    param = request.query_params.get("param", "").strip() or None
+    alpha_str = request.query_params.get("alpha", "0.05").strip()
+    try:
+        alpha = float(alpha_str)
+    except ValueError:
+        alpha = 0.05
+
+    try:
+        runner = ABTestRunner(log_dir=LOG_DIR, alpha=alpha)
+        result = runner.run(group_a, group_b, param=param)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return JSONResponse(content=result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Session Lifecycle page + API
+# ---------------------------------------------------------------------------
+
+@app.get("/lifecycle", response_class=HTMLResponse)
+async def lifecycle_page(request: Request):
+    """Session lifecycle management page."""
+    from session_lifecycle import SessionLifecycleManager, RetentionPolicy
+
+    keep_latest = request.query_params.get("keep_latest", "20")
+    keep_tagged = request.query_params.get("keep_tagged", "on")
+    keep_benchmark = request.query_params.get("keep_benchmark", "on")
+    action = request.query_params.get("action", "")
+
+    body = "<h1>Session Lifecycle</h1>"
+
+    # Policy configuration form
+    body += '<form method="get" action="/lifecycle">'
+    body += '<fieldset><legend>Retention Policy</legend>'
+    body += '<label>Keep latest N sessions: '
+    body += f'<input type="number" name="keep_latest" value="{keep_latest}" min="1" max="1000">'
+    body += '</label><br>'
+    checked_tag = "checked" if keep_tagged == "on" else ""
+    body += f'<label><input type="checkbox" name="keep_tagged" {checked_tag}> '
+    body += 'Keep tagged sessions</label><br>'
+    checked_bench = "checked" if keep_benchmark == "on" else ""
+    body += f'<label><input type="checkbox" name="keep_benchmark" {checked_bench}> '
+    body += 'Keep benchmark-passing sessions</label><br>'
+    body += '<button type="submit">Evaluate</button>'
+    body += ' <button type="submit" name="action" value="archive_dry">Dry Run Archive</button>'
+    body += '</fieldset></form>'
+
+    try:
+        kl = int(keep_latest)
+    except (ValueError, TypeError):
+        kl = 20
+
+    policy = RetentionPolicy(
+        keep_latest=kl,
+        keep_tagged=(keep_tagged == "on"),
+        keep_benchmark_pass=(keep_benchmark == "on"),
+    )
+    mgr = SessionLifecycleManager(log_dir=LOG_DIR, policy=policy)
+
+    # Always show evaluation
+    data = mgr.to_dict()
+    summary = data["summary"]
+
+    body += "<h2>Summary</h2>"
+    body += f"<p>Total: <strong>{summary['total_sessions']}</strong> sessions "
+    body += f"| Keep: <strong>{summary['keep']}</strong> "
+    body += f"| Archive: <strong>{summary['archive']}</strong></p>"
+
+    # Decisions table
+    if data["decisions"]:
+        body += "<h2>Decisions</h2>"
+        body += '<table><tr><th>Session</th><th>Action</th><th>Reasons</th></tr>'
+        for d in data["decisions"]:
+            reasons = "; ".join(d["reasons"]) if d["reasons"] else "-"
+            cls = "pass" if d["action"] == "keep" else "fail"
+            body += f'<tr><td>{d["csv_filename"]}</td>'
+            body += f'<td><span class="{cls}">{d["action"]}</span></td>'
+            body += f'<td>{reasons}</td></tr>'
+        body += "</table>"
+
+    # Disk usage
+    usage = data["disk_usage"]
+    body += "<h2>Disk Usage</h2>"
+    body += f"<p>Total: <strong>{usage['total_mb']:.2f} MB</strong> "
+    body += f"| CSV: {usage['csv_mb']:.2f} MB "
+    body += f"| JSON: {usage['json_mb']:.2f} MB "
+    body += f"| Archive: {usage['archive_mb']:.2f} MB</p>"
+    body += f"<p>Active sessions: {usage['session_count']} "
+    body += f"| Archived: {usage['archived_count']}</p>"
+
+    # Archive dry run results
+    if action == "archive_dry":
+        decisions = mgr.evaluate_retention()
+        to_archive = [d for d in decisions if d.action == "archive"]
+        if to_archive:
+            body += "<h2>Dry Run: Would Archive</h2><ul>"
+            for d in to_archive:
+                body += f"<li>{d.csv_filename}</li>"
+            body += "</ul>"
+            body += (
+                '<form method="post" action="/api/lifecycle/archive">'
+                f'<input type="hidden" name="keep_latest" value="{kl}">'
+                f'<input type="hidden" name="keep_tagged" value="{keep_tagged}">'
+                f'<input type="hidden" name="keep_benchmark" value="{keep_benchmark}">'
+                '<button type="submit" onclick="return confirm(\'Archive these sessions?\');">'
+                'Confirm Archive</button></form>'
+            )
+        else:
+            body += "<h2>Dry Run: Nothing to Archive</h2>"
+            body += "<p>All sessions are protected by the current policy.</p>"
+
+    return _render("Lifecycle", body)
+
+
+@app.get("/api/lifecycle")
+async def api_lifecycle(request: Request):
+    """JSON API: lifecycle evaluation + disk usage."""
+    from session_lifecycle import SessionLifecycleManager, RetentionPolicy
+
+    keep_latest = int(request.query_params.get("keep_latest", "20"))
+    keep_tagged = request.query_params.get("keep_tagged", "true") == "true"
+    keep_benchmark = request.query_params.get("keep_benchmark", "true") == "true"
+
+    policy = RetentionPolicy(
+        keep_latest=keep_latest,
+        keep_tagged=keep_tagged,
+        keep_benchmark_pass=keep_benchmark,
+    )
+    mgr = SessionLifecycleManager(log_dir=LOG_DIR, policy=policy)
+    return JSONResponse(content=mgr.to_dict())
+
+
+@app.post("/api/lifecycle/archive")
+async def api_lifecycle_archive(request: Request):
+    """POST API: execute archive based on policy."""
+    from session_lifecycle import SessionLifecycleManager, RetentionPolicy
+
+    form = await request.form()
+    keep_latest = int(form.get("keep_latest", "20"))
+    keep_tagged = form.get("keep_tagged", "on") == "on"
+    keep_benchmark = form.get("keep_benchmark", "on") == "on"
+
+    policy = RetentionPolicy(
+        keep_latest=keep_latest,
+        keep_tagged=keep_tagged,
+        keep_benchmark_pass=keep_benchmark,
+    )
+    mgr = SessionLifecycleManager(log_dir=LOG_DIR, policy=policy)
+    decisions = mgr.archive()
+    archived = [d.csv_filename for d in decisions if d.action == "archive"]
+
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/lifecycle", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes: Replay Annotations
+# ---------------------------------------------------------------------------
+
+@app.get("/session/{csv_filename}/annotations", response_class=HTMLResponse)
+async def session_annotations(csv_filename: str):
+    """Annotations page — timeline markers + annotation form."""
+    from replay_annotator import ReplayAnnotator, CATEGORIES
+
+    session = _load_session(csv_filename)
+    annotator = ReplayAnnotator(log_dir=LOG_DIR)
+    annotations = annotator.get_annotations(csv_filename)
+
+    body = f"<h1>Annotations: {session.timestamp}</h1>"
+
+    # Add annotation form
+    cat_options = "".join(f'<option value="{c}">{c}</option>' for c in CATEGORIES)
+    body += '<div class="card"><h2>Add Annotation</h2>'
+    body += f'<form method="post" action="/api/session/{csv_filename}/annotations">'
+    body += '<label>Step: <input type="number" name="step" min="0" required></label> '
+    body += '<label>Category: <select name="category">' + cat_options + '</select></label> '
+    body += '<label>Text: <input type="text" name="text" size="40" required></label> '
+    body += '<button class="btn" type="submit">Add</button>'
+    body += '</form></div>'
+
+    # Timeline with annotation markers
+    total_steps = session.total_steps
+    if annotations:
+        body += '<div class="card"><h2>Timeline</h2>'
+        # Build a step→annotations lookup
+        step_map: dict[int, list] = {}
+        for a in annotations:
+            step_map.setdefault(a.step, []).append(a)
+
+        cat_colors = {
+            "info": "#1565c0",
+            "warning": "#f57f17",
+            "success": "#2e7d32",
+            "danger": "#c62828",
+            "milestone": "#6a1b9a",
+        }
+
+        body += '<div style="position:relative;height:60px;background:#e3f2fd;'
+        body += 'border-radius:4px;margin:16px 0;">'
+        for step, anns in step_map.items():
+            pct = (step / max(total_steps - 1, 1)) * 100
+            color = cat_colors.get(anns[0].category, "#1565c0")
+            tooltip = "; ".join(f"[{a.category}] {a.text}" for a in anns)
+            body += (
+                f'<div style="position:absolute;left:{pct:.1f}%;top:0;bottom:0;'
+                f'width:3px;background:{color};" title="Step {step}: {tooltip}"></div>'
+            )
+        body += '</div>'
+
+        # Annotation table
+        body += "<table><tr><th>Step</th><th>Category</th><th>Text</th>"
+        body += "<th>Created</th><th>Actions</th></tr>"
+        for a in annotations:
+            color = cat_colors.get(a.category, "#333")
+            body += (
+                f'<tr><td>{a.step}</td>'
+                f'<td style="color:{color};font-weight:bold">{a.category}</td>'
+                f'<td>{a.text}</td>'
+                f'<td>{a.created_at[:19]}</td>'
+                f'<td><form method="post" action="/api/session/{csv_filename}/annotations" style="display:inline">'
+                f'<input type="hidden" name="action" value="remove">'
+                f'<input type="hidden" name="annotation_id" value="{a.id}">'
+                f'<button type="submit" style="color:red;background:none;border:none;cursor:pointer">Remove</button>'
+                f'</form></td></tr>'
+            )
+        body += "</table></div>"
+    else:
+        body += '<div class="card"><p>No annotations yet. Use the form above to add one.</p></div>'
+
+    body += (
+        f'<p><a class="btn" href="/session/{csv_filename}">Back to Session</a></p>'
+    )
+
+    return _render(f"Annotations: {session.timestamp}", body)
+
+
+@app.get("/api/session/{csv_filename}/annotations")
+async def api_session_annotations_get(csv_filename: str):
+    """JSON API: get annotations for a session."""
+    from replay_annotator import ReplayAnnotator
+
+    annotator = ReplayAnnotator(log_dir=LOG_DIR)
+    return JSONResponse(content=annotator.to_dict(csv_filename))
+
+
+@app.post("/api/session/{csv_filename}/annotations")
+async def api_session_annotations_post(csv_filename: str, request: Request):
+    """POST API: add or remove annotations."""
+    from replay_annotator import ReplayAnnotator
+
+    annotator = ReplayAnnotator(log_dir=LOG_DIR)
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        data = await request.json()
+    else:
+        form = await request.form()
+        data = dict(form)
+
+    action = data.get("action", "add")
+
+    if action == "remove":
+        annotation_id = data.get("annotation_id", "")
+        annotator.remove_annotation(csv_filename, annotation_id)
+    else:
+        step = int(data.get("step", 0))
+        text = str(data.get("text", ""))
+        category = str(data.get("category", "info"))
+        if text.strip():
+            annotator.add_annotation(csv_filename, step, text, category)
+
+    # If form submission, redirect back
+    if "application/json" not in content_type:
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"/session/{csv_filename}/annotations", status_code=303
+        )
+
+    return JSONResponse(content=annotator.to_dict(csv_filename))
+
+
+# ---------------------------------------------------------------------------
+# Routes: Session Goals
+# ---------------------------------------------------------------------------
+
+@app.get("/goals", response_class=HTMLResponse)
+async def goals_page(request: Request):
+    """Goals page — list, create, evaluate, progress."""
+    from session_goal import SessionGoalManager
+    from session_replay import SessionData
+
+    mgr = SessionGoalManager(log_dir=LOG_DIR)
+    goals = mgr.list_goals()
+
+    show_game = request.query_params.get("game", "").strip()
+
+    body = "<h1>Session Goals</h1>"
+
+    # Create goal form
+    body += '<div class="card"><h3>Create Goal</h3>'
+    body += '<form method="post" action="/api/goals">'
+    body += '<input type="hidden" name="action" value="create">'
+    body += '<label>Name: <input type="text" name="name" required style="padding:6px;width:150px;"></label> '
+    body += '<label>Game ID: <input type="text" name="game_id" required style="padding:6px;width:120px;"></label> '
+    body += '<label>Min Steps: <input type="number" name="min_steps" placeholder="optional" style="padding:6px;width:100px;"></label><br><br>'
+    body += '<label>Param Conditions: <input type="text" name="param_conditions" placeholder="e.g. hp last >= 50, gold mean > 1000" style="padding:6px;width:400px;"></label> '
+    body += '<label>Description: <input type="text" name="description" placeholder="optional" style="padding:6px;width:200px;"></label> '
+    body += '<button class="btn" type="submit">Create</button>'
+    body += '</form></div>'
+
+    # Goal list
+    if goals:
+        body += "<h2>All Goals</h2>"
+        body += "<table><tr><th>Name</th><th>Game</th><th>Criteria</th><th>Description</th><th>Actions</th></tr>"
+        for g in goals:
+            body += (
+                f'<tr><td><a href="/goals?game={g.game_id}">{g.name}</a></td>'
+                f'<td>{g.game_id}</td>'
+                f'<td>{g.criteria_count}</td>'
+                f'<td>{g.description}</td>'
+                f'<td>'
+                f'<form method="post" action="/api/goals" style="display:inline;">'
+                f'<input type="hidden" name="action" value="delete">'
+                f'<input type="hidden" name="name" value="{g.name}">'
+                f'<button class="btn" type="submit" style="background:#e53935;font-size:12px;padding:4px 8px;">Delete</button>'
+                f'</form></td></tr>'
+            )
+        body += "</table>"
+    else:
+        body += "<p>No goals defined yet.</p>"
+
+    # Game-specific evaluation results
+    if show_game:
+        game_goals = mgr.list_goals(game_id=show_game)
+        if game_goals:
+            sessions = SessionData.discover_sessions(LOG_DIR, game_id=show_game)
+            if sessions:
+                results = mgr.evaluate_all(game_id=show_game)
+                body += f'<h2>Evaluation: {show_game}</h2>'
+                if results:
+                    body += '<table><tr><th>Session</th><th>Goal</th><th>Achieved</th>'
+                    body += '<th>Passed</th><th>Total</th><th>Rate</th><th>Details</th></tr>'
+                    for r in results:
+                        color = "#2e7d32" if r.achieved else "#c62828"
+                        status = "YES" if r.achieved else "NO"
+                        rate_pct = f"{r.pass_rate * 100:.0f}%"
+                        detail_parts = []
+                        for d in r.details:
+                            icon = "&#10004;" if d["passed"] else "&#10008;"
+                            detail_parts.append(f'{icon} {d["criterion"]} (actual: {d["actual"]})')
+                        details_str = "<br>".join(detail_parts)
+                        body += (
+                            f'<tr><td><a href="/session/{r.csv_filename}">{r.csv_filename}</a></td>'
+                            f'<td>{r.goal_name}</td>'
+                            f'<td style="color:{color};font-weight:bold">{status}</td>'
+                            f'<td>{r.passed_criteria}</td><td>{r.total_criteria}</td>'
+                            f'<td>{rate_pct}</td>'
+                            f'<td style="font-size:12px;">{details_str}</td></tr>'
+                        )
+                    body += '</table>'
+                else:
+                    body += '<p>No matching goals for sessions.</p>'
+
+                # Progress chart
+                progress = mgr.progress_over_time(game_id=show_game)
+                if progress:
+                    body += '<div class="card"><h3>Achievement Progress</h3>'
+                    for goal_name, entries in sorted(progress.items()):
+                        achieved_count = sum(1 for e in entries if e["achieved"])
+                        total_count = len(entries)
+                        rate = achieved_count / total_count * 100 if total_count else 0
+                        body += f'<h4>{goal_name}: {achieved_count}/{total_count} ({rate:.0f}%)</h4>'
+                        # Simple bar visualization
+                        body += '<div style="display:flex;gap:2px;margin:8px 0;">'
+                        for e in entries:
+                            color = "#2e7d32" if e["achieved"] else "#c62828"
+                            body += (
+                                f'<div style="width:20px;height:20px;background:{color};'
+                                f'border-radius:2px;" title="{e["timestamp"]}: '
+                                f'{"achieved" if e["achieved"] else "failed"}"></div>'
+                            )
+                        body += '</div>'
+                    body += '</div>'
+            else:
+                body += f'<p>No sessions found for game: {show_game}</p>'
+        else:
+            body += f'<p>No goals defined for game: {show_game}</p>'
+
+    return _render("Goals", body)
+
+
+@app.get("/api/goals")
+async def api_goals(request: Request):
+    """JSON API: list goals + optionally evaluate."""
+    from session_goal import SessionGoalManager
+
+    mgr = SessionGoalManager(log_dir=LOG_DIR)
+    game_id = request.query_params.get("game")
+
+    result = mgr.to_dict()
+    if game_id:
+        result["game_filter"] = game_id
+        result["goals"] = [g for g in result["goals"] if g["game_id"] == game_id]
+        result["total_goals"] = len(result["goals"])
+        # Include evaluation results
+        eval_results = mgr.evaluate_all(game_id=game_id)
+        result["evaluation"] = [r.to_dict() for r in eval_results]
+        # Include progress
+        progress = mgr.progress_over_time(game_id=game_id)
+        result["progress"] = progress
+
+    return JSONResponse(content=result)
+
+
+@app.post("/api/goals")
+async def api_goals_post(request: Request):
+    """POST API: create/delete goals."""
+    from session_goal import SessionGoalManager
+
+    mgr = SessionGoalManager(log_dir=LOG_DIR)
+    form = await request.form()
+    action = form.get("action", "create")
+
+    if action == "delete":
+        name = form.get("name", "")
+        try:
+            mgr.delete_goal(name)
+        except KeyError:
+            pass
+    else:
+        name = str(form.get("name", "")).strip()
+        game_id = str(form.get("game_id", "")).strip()
+        min_steps_raw = str(form.get("min_steps", "")).strip()
+        min_steps = int(min_steps_raw) if min_steps_raw else None
+        params_raw = str(form.get("param_conditions", "")).strip()
+        param_conditions = [
+            p.strip() for p in params_raw.split(",") if p.strip()
+        ] if params_raw else []
+        description = str(form.get("description", "")).strip()
+
+        if name and game_id:
+            mgr.create_goal(
+                name, game_id=game_id,
+                param_conditions=param_conditions,
+                min_steps=min_steps,
+                description=description,
+            )
+
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/goals", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Routes: Strategy History
+# ---------------------------------------------------------------------------
+
+def _strategy_pie_chart_to_base64(usage: dict[str, int]) -> str:
+    """Generate a pie chart of strategy usage distribution as base64."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = list(usage.keys())
+    sizes = list(usage.values())
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+              "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90,
+           colors=colors[:len(labels)])
+    ax.set_title("Strategy Usage Distribution")
+    fig.tight_layout()
+
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100)
+    plt.close(fig)
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+def _strategy_trend_chart_to_base64(trend: dict[str, list[dict]]) -> str:
+    """Generate a line chart of strategy effectiveness over time as base64."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+              "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    for idx, (strat, entries) in enumerate(trend.items()):
+        scores = [e["score"] for e in entries]
+        labels = [e["session"][:8] for e in entries]
+        ax.plot(range(len(scores)), scores, marker="o",
+                color=colors[idx % len(colors)], label=strat)
+    ax.set_xlabel("Session")
+    ax.set_ylabel("Effectiveness Score")
+    ax.set_title("Strategy Effectiveness Trend")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100)
+    plt.close(fig)
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+def _transition_heatmap_to_base64(matrix) -> str:
+    """Generate a heatmap of the strategy transition matrix as base64."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    data = matrix.values.astype(float)
+    im = ax.imshow(data, cmap="YlOrRd", aspect="auto")
+
+    strategies = list(matrix.columns)
+    ax.set_xticks(range(len(strategies)))
+    ax.set_xticklabels(strategies, rotation=45, ha="right")
+    ax.set_yticks(range(len(strategies)))
+    ax.set_yticklabels(strategies)
+    ax.set_xlabel("To")
+    ax.set_ylabel("From")
+    ax.set_title("Strategy Transition Heatmap")
+
+    # Annotate cells
+    for i in range(len(strategies)):
+        for j in range(len(strategies)):
+            val = int(data[i, j])
+            if val > 0:
+                ax.text(j, i, str(val), ha="center", va="center",
+                        color="white" if val > data.max() / 2 else "black")
+
+    fig.colorbar(im, ax=ax, label="Count")
+    fig.tight_layout()
+
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100)
+    plt.close(fig)
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+@app.get("/strategy-history", response_class=HTMLResponse)
+async def strategy_history_page(request: Request):
+    """Strategy evolution analysis page."""
+    from session_replay import SessionData
+    from strategy_history import StrategyHistory
+
+    game_filter = request.query_params.get("game")
+    sessions = SessionData.discover_sessions(LOG_DIR, game_id=game_filter)
+
+    body = "<h1>Strategy History</h1>"
+
+    # Game filter form
+    all_sessions = SessionData.discover_sessions(LOG_DIR)
+    game_ids = sorted({s.game_id for s in all_sessions})
+    if game_ids:
+        body += '<form method="get"><label>Game: <select name="game">'
+        body += '<option value="">All</option>'
+        for gid in game_ids:
+            sel = ' selected' if gid == game_filter else ''
+            body += f'<option value="{gid}"{sel}>{gid}</option>'
+        body += '</select></label> <button class="btn" type="submit">Filter</button></form>'
+
+    if not sessions:
+        body += f"<p>No sessions found in <code>{LOG_DIR}</code>.</p>"
+        return _render("Strategy History", body)
+
+    try:
+        sh = StrategyHistory(sessions)
+    except ValueError as exc:
+        body += f"<p>Error: {exc}</p>"
+        return _render("Strategy History", body)
+
+    body += f"<p>Analyzing {len(sessions)} session(s).</p>"
+
+    # --- 1. Usage distribution pie chart ---
+    usage = sh.strategy_usage_distribution()
+    if usage:
+        body += '<div class="card"><h2>Usage Distribution</h2>'
+        try:
+            src = _strategy_pie_chart_to_base64(usage)
+            body += f'<img src="{src}" alt="Strategy usage pie chart" style="max-width:100%;">'
+        except Exception:
+            pass
+        # Also show table
+        total = sum(usage.values())
+        body += "<table><tr><th>Strategy</th><th>Steps</th><th>%</th></tr>"
+        for strat, steps in usage.items():
+            pct = steps / total * 100 if total else 0
+            body += f"<tr><td>{strat}</td><td>{steps}</td><td>{pct:.1f}%</td></tr>"
+        body += "</table></div>"
+
+    # --- 2. Effectiveness trend chart ---
+    trend = sh.strategy_effectiveness_trend()
+    if trend:
+        body += '<div class="card"><h2>Effectiveness Trend</h2>'
+        try:
+            src = _strategy_trend_chart_to_base64(trend)
+            body += f'<img src="{src}" alt="Strategy effectiveness trend" style="max-width:100%;">'
+        except Exception:
+            pass
+        # Trend details table
+        body += "<table><tr><th>Strategy</th><th>Session</th><th>Score</th><th>Steps</th><th>Param Deltas</th></tr>"
+        for strat, entries in trend.items():
+            for entry in entries:
+                deltas = ", ".join(f"{k}: {v:+.1f}" for k, v in entry["param_deltas"].items())
+                body += (
+                    f"<tr><td>{strat}</td><td>{entry['session']}</td>"
+                    f"<td>{entry['score']:.1f}</td><td>{entry['steps']}</td>"
+                    f"<td>{deltas}</td></tr>"
+                )
+        body += "</table></div>"
+
+    # --- 3. Transition matrix heatmap ---
+    matrix = sh.strategy_transition_matrix()
+    if not matrix.empty:
+        body += '<div class="card"><h2>Transition Matrix</h2>'
+        try:
+            src = _transition_heatmap_to_base64(matrix)
+            body += f'<img src="{src}" alt="Transition heatmap" style="max-width:100%;">'
+        except Exception:
+            pass
+        # Also show table
+        strategies = list(matrix.columns)
+        body += "<table><tr><th>From \\ To</th>"
+        for s in strategies:
+            body += f"<th>{s}</th>"
+        body += "</tr>"
+        for s in strategies:
+            body += f"<tr><td><strong>{s}</strong></td>"
+            for t in strategies:
+                val = int(matrix.loc[s, t])
+                style = ' style="background:#ff7f0e;color:white;"' if val > 0 else ''
+                body += f"<td{style}>{val}</td>"
+            body += "</tr>"
+        body += "</table></div>"
+
+    # --- 4. Optimal strategy per parameter ---
+    optimal = sh.optimal_strategy_for_state()
+    if optimal:
+        body += '<div class="card"><h2>Optimal Strategy per Parameter</h2>'
+        body += "<table><tr><th>Parameter</th><th>Best Strategy</th><th>Avg Value</th><th>All Strategies</th></tr>"
+        for entry in optimal:
+            others = ", ".join(f"{k}: {v:.1f}" for k, v in entry["all_strategies"].items())
+            body += (
+                f"<tr><td>{entry['parameter']}</td>"
+                f'<td><strong>{entry["best_strategy"]}</strong></td>'
+                f"<td>{entry['avg_value']:.1f}</td>"
+                f"<td>{others}</td></tr>"
+            )
+        body += "</table></div>"
+
+    return _render("Strategy History", body)
+
+
+@app.get("/api/strategy-history")
+async def api_strategy_history(request: Request):
+    """JSON API: strategy history analysis."""
+    from session_replay import SessionData
+    from strategy_history import StrategyHistory
+
+    game_filter = request.query_params.get("game")
+    sessions = SessionData.discover_sessions(LOG_DIR, game_id=game_filter)
+
+    if not sessions:
+        return JSONResponse(content={"error": "No sessions found", "session_count": 0})
+
+    try:
+        sh = StrategyHistory(sessions)
+    except ValueError as exc:
+        return JSONResponse(content={"error": str(exc)})
+
+    return JSONResponse(content=sh.to_dict())
 
 
 # ---------------------------------------------------------------------------

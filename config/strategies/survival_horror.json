@@ -1,0 +1,11 @@
+{
+  "genre": "survival_horror",
+  "description": "Survival horror games (e.g., Resident Evil, Silent Hill)",
+  "thresholds": [
+    {"parameter": "hp", "operator": "lt", "value": 200, "target_strategy": "defensive", "priority": 10},
+    {"parameter": "ammo_handgun", "operator": "lt", "value": 5, "target_strategy": "conservation", "priority": 9},
+    {"parameter": "herbs", "operator": "lt", "value": 1, "target_strategy": "conservation", "priority": 8},
+    {"parameter": "hp", "operator": "gt", "value": 800, "target_strategy": "aggressive", "priority": 5},
+    {"parameter": "room_danger", "operator": "lt", "value": 3, "target_strategy": "exploration", "priority": 3}
+  ]
+}

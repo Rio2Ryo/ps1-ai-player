@@ -1,0 +1,12 @@
+{
+  "game_id": "SLUS-00170",
+  "title": "Resident Evil (Director's Cut)",
+  "parameters": {
+    "hp": {"address": "0x800C8578", "type": "int16", "description": "Player HP (0-1200)"},
+    "ammo_handgun": {"address": "0x800C86D8", "type": "int8", "description": "Handgun ammo count"},
+    "ammo_shotgun": {"address": "0x800C86DA", "type": "int8", "description": "Shotgun ammo count"},
+    "herbs": {"address": "0x800C86E0", "type": "int8", "description": "Healing herbs count"},
+    "ink_ribbons": {"address": "0x800C86E4", "type": "int8", "description": "Ink ribbon count (save tokens)"},
+    "room_id": {"address": "0x800C5724", "type": "int16", "description": "Current room ID"}
+  }
+}

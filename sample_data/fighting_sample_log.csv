@@ -1,0 +1,721 @@
+timestamp,step,action,reasoning,observations,p1_hp,p2_hp,round,timer,combo_hits
+2025-01-01T12:00:00,0,punch,quick jab,"Round 1, Timer 59",170.0,163.1,1,58.9,1
+2025-01-01T12:00:02,1,punch,quick jab,"Round 1, Timer 58",157.4,155.1,1,57.7,1
+2025-01-01T12:00:04,2,combo,continuing 1-hit combo,"Round 1, Timer 57",157.4,143.6,1,57.2,2
+2025-01-01T12:00:06,3,dodge,sidestepping,"Round 1, Timer 56",157.4,143.6,1,56.4,2
+2025-01-01T12:00:08,4,block,reading opponent's attack,"Round 1, Timer 56",156.4,143.6,1,55.9,2
+2025-01-01T12:00:10,5,kick,mid kick,"Round 1, Timer 55",156.4,134.7,1,55.3,1
+2025-01-01T12:00:12,6,block,reading opponent's attack,"Round 1, Timer 54",154.8,134.7,1,54.2,1
+2025-01-01T12:00:14,7,combo,continuing 1-hit combo,"Round 1, Timer 53",154.8,124.2,1,52.7,2
+2025-01-01T12:00:16,8,throw,throw whiffed,"Round 1, Timer 52",146.4,124.2,1,51.6,2
+2025-01-01T12:00:18,9,combo,continuing 2-hit combo,"Round 1, Timer 51",133.6,116.8,1,50.8,0
+2025-01-01T12:00:20,10,kick,mid kick,"Round 1, Timer 50",114.5,105.1,1,49.7,0
+2025-01-01T12:00:22,11,throw,throw attempt,"Round 1, Timer 49",103.9,82.9,1,48.5,0
+2025-01-01T12:00:24,12,throw,throw whiffed,"Round 1, Timer 47",103.9,82.9,1,47.0,0
+2025-01-01T12:00:26,13,block,reading opponent's attack,"Round 1, Timer 46",103.2,82.9,1,45.7,0
+2025-01-01T12:00:28,14,kick,mid kick,"Round 1, Timer 45",103.2,72.2,1,45.1,0
+2025-01-01T12:00:30,15,kick,mid kick,"Round 1, Timer 44",103.2,57.6,1,43.8,0
+2025-01-01T12:00:32,16,kick,mid kick,"Round 1, Timer 43",89.4,47.2,1,42.8,0
+2025-01-01T12:00:34,17,kick,mid kick,"Round 1, Timer 41",89.4,37.0,1,41.4,0
+2025-01-01T12:00:36,18,punch,quick jab,"Round 1, Timer 41",89.4,31.2,1,40.8,0
+2025-01-01T12:00:38,19,punch,quick jab,"Round 1, Timer 40",89.4,23.5,1,39.9,0
+2025-01-01T12:00:40,20,kick,pressuring low-HP opponent,"Round 1, Timer 38",89.4,15.4,1,38.4,0
+2025-01-01T12:00:42,21,kick,pressuring low-HP opponent,"Round 1, Timer 37",89.4,2.0,1,37.2,0
+2025-01-01T12:00:44,22,kick,pressuring low-HP opponent,"Round 1, Timer 36",89.4,0.0,1,36.4,0
+2025-01-01T12:00:46,23,round_start,new round beginning,"Round 1, Timer 36",170.0,170.0,2,60.0,0
+2025-01-01T12:00:48,24,dodge,sidestepping,"Round 2, Timer 59",170.0,170.0,2,59.0,0
+2025-01-01T12:00:50,25,kick,mid kick,"Round 2, Timer 58",170.0,157.0,2,57.7,1
+2025-01-01T12:00:52,26,combo,continuing 1-hit combo,"Round 2, Timer 56",170.0,145.6,2,56.3,2
+2025-01-01T12:00:54,27,special_move,special attack,"Round 2, Timer 56",160.1,115.0,2,55.6,2
+2025-01-01T12:00:56,28,dodge,sidestepping,"Round 2, Timer 55",160.1,115.0,2,55.1,2
+2025-01-01T12:00:58,29,combo,continuing 2-hit combo,"Round 2, Timer 54",160.1,109.5,2,53.8,3
+2025-01-01T12:01:00,30,combo,continuing 3-hit combo,"Round 2, Timer 52",142.5,99.6,2,52.3,0
+2025-01-01T12:01:02,31,punch,quick jab,"Round 2, Timer 51",124.4,91.3,2,51.1,0
+2025-01-01T12:01:04,32,punch,quick jab,"Round 2, Timer 50",114.8,82.5,2,50.2,0
+2025-01-01T12:01:06,33,throw,throw attempt,"Round 2, Timer 49",106.4,62.3,2,48.7,0
+2025-01-01T12:01:08,34,throw,throw attempt,"Round 2, Timer 48",91.9,45.1,2,47.8,0
+2025-01-01T12:01:10,35,dodge,sidestepping,"Round 2, Timer 47",91.9,45.1,2,47.1,0
+2025-01-01T12:01:12,36,punch,quick jab,"Round 2, Timer 46",84.9,38.4,2,45.7,0
+2025-01-01T12:01:14,37,throw,throw attempt,"Round 2, Timer 44",84.9,15.6,2,44.3,0
+2025-01-01T12:01:16,38,special_move,finishing opponent with special,"Round 2, Timer 44",84.9,0.0,2,43.6,0
+2025-01-01T12:01:18,39,round_start,new round beginning,"Round 2, Timer 43",170.0,170.0,3,60.0,0
+2025-01-01T12:01:20,40,block,reading opponent's attack,"Round 3, Timer 59",167.0,170.0,3,58.8,0
+2025-01-01T12:01:22,41,kick,mid kick,"Round 3, Timer 58",159.2,158.6,3,58.2,0
+2025-01-01T12:01:24,42,kick,mid kick,"Round 3, Timer 57",159.2,147.8,3,57.2,0
+2025-01-01T12:01:26,43,dodge,sidestepping,"Round 3, Timer 56",159.2,147.8,3,56.3,0
+2025-01-01T12:01:28,44,punch,quick jab,"Round 3, Timer 55",159.2,135.8,3,55.2,0
+2025-01-01T12:01:30,45,dodge,sidestepping,"Round 3, Timer 54",159.2,135.8,3,53.8,0
+2025-01-01T12:01:32,46,special_move,special attack,"Round 3, Timer 53",148.5,116.6,3,53.1,0
+2025-01-01T12:01:34,47,kick,mid kick,"Round 3, Timer 52",148.5,100.7,3,51.7,0
+2025-01-01T12:01:36,48,dodge,sidestepping,"Round 3, Timer 50",148.5,100.7,3,50.2,0
+2025-01-01T12:01:38,49,block,reading opponent's attack,"Round 3, Timer 49",148.0,100.7,3,49.1,0
+2025-01-01T12:01:40,50,dodge,sidestepping,"Round 3, Timer 48",148.0,100.7,3,48.3,0
+2025-01-01T12:01:42,51,special_move,special attack,"Round 3, Timer 47",132.2,70.8,3,47.3,0
+2025-01-01T12:01:44,52,punch,quick jab,"Round 3, Timer 46",118.3,59.0,3,45.9,1
+2025-01-01T12:01:46,53,combo,continuing 1-hit combo,"Round 3, Timer 45",118.3,52.8,3,44.7,2
+2025-01-01T12:01:48,54,throw,throw attempt,"Round 3, Timer 44",118.3,32.0,3,44.0,2
+2025-01-01T12:01:50,55,combo,continuing 2-hit combo,"Round 3, Timer 43",118.3,19.8,3,42.6,3
+2025-01-01T12:01:52,56,special_move,finishing opponent with special,"Round 3, Timer 42",118.3,0.0,3,41.7,3
+2025-01-01T12:01:54,57,round_start,new round beginning,"Round 3, Timer 41",170.0,170.0,4,60.0,0
+2025-01-01T12:01:56,58,dodge,sidestepping,"Round 4, Timer 59",170.0,170.0,4,59.0,0
+2025-01-01T12:01:58,59,punch,quick jab,"Round 4, Timer 58",170.0,163.5,4,57.5,1
+2025-01-01T12:02:00,60,kick,mid kick,"Round 4, Timer 56",170.0,153.9,4,56.2,1
+2025-01-01T12:02:02,61,block,reading opponent's attack,"Round 4, Timer 55",170.0,153.9,4,55.1,1
+2025-01-01T12:02:04,62,combo,continuing 1-hit combo,"Round 4, Timer 54",170.0,142.3,4,53.7,2
+2025-01-01T12:02:06,63,combo,continuing 2-hit combo,"Round 4, Timer 53",170.0,136.2,4,53.1,3
+2025-01-01T12:02:08,64,block,reading opponent's attack,"Round 4, Timer 52",169.4,136.2,4,52.3,3
+2025-01-01T12:02:10,65,combo,continuing 3-hit combo,"Round 4, Timer 51",169.4,126.3,4,51.2,4
+2025-01-01T12:02:12,66,combo,continuing 4-hit combo,"Round 4, Timer 50",169.4,117.1,4,49.8,5
+2025-01-01T12:02:14,67,throw,throw attempt,"Round 4, Timer 49",169.4,94.7,4,49.3,5
+2025-01-01T12:02:16,68,combo,continuing 5-hit combo,"Round 4, Timer 48",169.4,88.9,4,48.4,6
+2025-01-01T12:02:18,69,dodge,sidestepping,"Round 4, Timer 47",169.4,88.9,4,47.0,6
+2025-01-01T12:02:20,70,combo,continuing 6-hit combo,"Round 4, Timer 46",169.4,82.7,4,45.9,7
+2025-01-01T12:02:22,71,dodge,sidestepping,"Round 4, Timer 45",169.4,82.7,4,44.5,7
+2025-01-01T12:02:24,72,combo,continuing 7-hit combo,"Round 4, Timer 43",151.6,75.2,4,43.1,0
+2025-01-01T12:02:26,73,kick,mid kick,"Round 4, Timer 42",151.6,61.0,4,41.7,1
+2025-01-01T12:02:28,74,dodge,sidestepping,"Round 4, Timer 40",151.6,61.0,4,40.4,1
+2025-01-01T12:02:30,75,combo,continuing 1-hit combo,"Round 4, Timer 39",151.6,48.6,4,39.0,2
+2025-01-01T12:02:32,76,dodge,sidestepping,"Round 4, Timer 38",151.6,48.6,4,37.6,2
+2025-01-01T12:02:34,77,combo,continuing 2-hit combo,"Round 4, Timer 36",132.8,35.7,4,36.3,0
+2025-01-01T12:02:36,78,punch,quick jab,"Round 4, Timer 35",115.9,25.0,4,34.9,0
+2025-01-01T12:02:38,79,special_move,finishing opponent with special,"Round 4, Timer 34",115.9,6.1,4,34.2,0
+2025-01-01T12:02:40,80,kick,pressuring low-HP opponent,"Round 4, Timer 33",115.9,0.0,4,32.8,0
+2025-01-01T12:02:42,81,round_start,new round beginning,"Round 4, Timer 32",170.0,170.0,5,60.0,0
+2025-01-01T12:02:44,82,dodge,sidestepping,"Round 5, Timer 59",170.0,170.0,5,59.1,0
+2025-01-01T12:02:46,83,dodge,sidestepping,"Round 5, Timer 58",170.0,170.0,5,58.1,0
+2025-01-01T12:02:48,84,dodge,sidestepping,"Round 5, Timer 57",170.0,170.0,5,57.4,0
+2025-01-01T12:02:50,85,dodge,sidestepping,"Round 5, Timer 57",170.0,170.0,5,56.8,0
+2025-01-01T12:02:52,86,punch,quick jab,"Round 5, Timer 56",155.9,162.0,5,56.0,0
+2025-01-01T12:02:54,87,kick,mid kick,"Round 5, Timer 55",155.9,148.2,5,55.0,0
+2025-01-01T12:02:56,88,dodge,sidestepping,"Round 5, Timer 54",155.9,148.2,5,54.5,0
+2025-01-01T12:02:58,89,block,reading opponent's attack,"Round 5, Timer 53",153.7,148.2,5,53.5,0
+2025-01-01T12:03:00,90,kick,mid kick,"Round 5, Timer 52",144.0,139.5,5,52.3,0
+2025-01-01T12:03:02,91,block,reading opponent's attack,"Round 5, Timer 51",143.1,139.5,5,50.9,0
+2025-01-01T12:03:04,92,kick,mid kick,"Round 5, Timer 50",131.8,127.5,5,50.1,0
+2025-01-01T12:03:06,93,block,reading opponent's attack,"Round 5, Timer 49",129.1,127.5,5,48.7,0
+2025-01-01T12:03:08,94,kick,mid kick,"Round 5, Timer 48",117.6,114.0,5,47.6,1
+2025-01-01T12:03:10,95,special_move,special attack,"Round 5, Timer 46",102.9,90.1,5,46.5,1
+2025-01-01T12:03:12,96,combo,continuing 1-hit combo,"Round 5, Timer 45",102.9,84.3,5,45.2,2
+2025-01-01T12:03:14,97,combo,continuing 2-hit combo,"Round 5, Timer 44",102.9,71.1,5,44.1,3
+2025-01-01T12:03:16,98,combo,continuing 3-hit combo,"Round 5, Timer 43",90.4,64.1,5,42.9,0
+2025-01-01T12:03:18,99,dodge,sidestepping,"Round 5, Timer 42",90.4,64.1,5,41.9,0
+2025-01-01T12:03:20,100,kick,mid kick,"Round 5, Timer 41",90.4,49.8,5,41.3,1
+2025-01-01T12:03:22,101,combo,continuing 1-hit combo,"Round 5, Timer 40",72.9,38.3,5,40.3,0
+2025-01-01T12:03:24,102,punch,quick jab,"Round 5, Timer 39",72.9,30.3,5,39.1,1
+2025-01-01T12:03:26,103,combo,continuing 1-hit combo,"Round 5, Timer 38",72.9,22.8,5,38.1,2
+2025-01-01T12:03:28,104,kick,pressuring low-HP opponent,"Round 5, Timer 37",72.9,4.9,5,37.1,2
+2025-01-01T12:03:30,105,kick,pressuring low-HP opponent,"Round 5, Timer 36",72.9,0.0,5,36.0,2
+2025-01-01T12:03:32,106,round_start,new round beginning,"Round 5, Timer 35",170.0,170.0,6,60.0,0
+2025-01-01T12:03:34,107,dodge,sidestepping,"Round 6, Timer 59",170.0,170.0,6,59.0,0
+2025-01-01T12:03:36,108,dodge,sidestepping,"Round 6, Timer 58",170.0,170.0,6,57.9,0
+2025-01-01T12:03:38,109,special_move,special attack,"Round 6, Timer 57",153.6,149.8,6,56.7,0
+2025-01-01T12:03:40,110,throw,throw attempt,"Round 6, Timer 56",144.5,134.0,6,55.7,0
+2025-01-01T12:03:42,111,special_move,special attack,"Round 6, Timer 55",127.6,116.3,6,54.9,0
+2025-01-01T12:03:44,112,kick,mid kick,"Round 6, Timer 54",116.3,102.8,6,54.3,0
+2025-01-01T12:03:46,113,throw,throw whiffed,"Round 6, Timer 53",116.3,102.8,6,52.9,0
+2025-01-01T12:03:48,114,kick,mid kick,"Round 6, Timer 52",116.3,94.8,6,51.6,0
+2025-01-01T12:03:50,115,dodge,sidestepping,"Round 6, Timer 50",116.3,94.8,6,50.3,0
+2025-01-01T12:03:52,116,block,reading opponent's attack,"Round 6, Timer 49",114.7,94.8,6,49.4,0
+2025-01-01T12:03:54,117,punch,quick jab,"Round 6, Timer 48",104.6,88.3,6,48.3,0
+2025-01-01T12:03:56,118,kick,mid kick,"Round 6, Timer 47",90.3,78.6,6,47.1,0
+2025-01-01T12:03:58,119,kick,mid kick,"Round 6, Timer 47",90.3,65.0,6,46.5,1
+2025-01-01T12:04:00,120,combo,continuing 1-hit combo,"Round 6, Timer 46",90.3,59.5,6,45.9,2
+2025-01-01T12:04:02,121,combo,continuing 2-hit combo,"Round 6, Timer 45",90.3,46.8,6,45.2,3
+2025-01-01T12:04:04,122,kick,mid kick,"Round 6, Timer 44",90.3,38.0,6,43.9,1
+2025-01-01T12:04:06,123,combo,continuing 1-hit combo,"Round 6, Timer 42",90.3,26.5,6,42.4,2
+2025-01-01T12:04:08,124,kick,pressuring low-HP opponent,"Round 6, Timer 41",90.3,16.5,6,41.3,2
+2025-01-01T12:04:10,125,combo,continuing 2-hit combo,"Round 6, Timer 41",90.3,10.3,6,40.8,3
+2025-01-01T12:04:12,126,combo,continuing 3-hit combo,"Round 6, Timer 40",90.3,0.0,6,39.7,4
+2025-01-01T12:04:14,127,round_start,new round beginning,"Round 6, Timer 39",170.0,170.0,7,60.0,0
+2025-01-01T12:04:16,128,block,reading opponent's attack,"Round 7, Timer 59",169.7,170.0,7,58.9,0
+2025-01-01T12:04:18,129,dodge,sidestepping,"Round 7, Timer 58",169.7,170.0,7,57.6,0
+2025-01-01T12:04:20,130,punch,quick jab,"Round 7, Timer 57",169.7,162.8,7,57.0,0
+2025-01-01T12:04:22,131,block,reading opponent's attack,"Round 7, Timer 56",169.4,162.8,7,56.1,0
+2025-01-01T12:04:24,132,throw,throw attempt,"Round 7, Timer 55",169.4,140.1,7,54.9,0
+2025-01-01T12:04:26,133,punch,quick jab,"Round 7, Timer 54",158.0,128.2,7,53.8,0
+2025-01-01T12:04:28,134,special_move,special attack,"Round 7, Timer 53",158.0,106.4,7,52.9,0
+2025-01-01T12:04:30,135,dodge,sidestepping,"Round 7, Timer 52",158.0,106.4,7,52.3,0
+2025-01-01T12:04:32,136,dodge,sidestepping,"Round 7, Timer 51",158.0,106.4,7,51.2,0
+2025-01-01T12:04:34,137,kick,mid kick,"Round 7, Timer 50",140.9,91.0,7,50.0,0
+2025-01-01T12:04:36,138,special_move,special attack,"Round 7, Timer 49",123.1,67.3,7,48.9,0
+2025-01-01T12:04:38,139,punch,quick jab,"Round 7, Timer 48",123.1,56.2,7,47.6,1
+2025-01-01T12:04:40,140,combo,continuing 1-hit combo,"Round 7, Timer 46",123.1,50.9,7,46.5,2
+2025-01-01T12:04:42,141,combo,continuing 2-hit combo,"Round 7, Timer 46",123.1,37.9,7,45.8,3
+2025-01-01T12:04:44,142,kick,mid kick,"Round 7, Timer 44",107.3,29.8,7,44.4,3
+2025-01-01T12:04:46,143,kick,pressuring low-HP opponent,"Round 7, Timer 43",107.3,15.3,7,43.4,3
+2025-01-01T12:04:48,144,special_move,finishing opponent with special,"Round 7, Timer 42",107.3,0.0,7,42.4,3
+2025-01-01T12:04:50,145,round_start,new round beginning,"Round 7, Timer 42",170.0,170.0,8,60.0,0
+2025-01-01T12:04:52,146,special_move,special attack,"Round 8, Timer 59",170.0,144.4,8,58.9,0
+2025-01-01T12:04:54,147,block,reading opponent's attack,"Round 8, Timer 58",169.2,144.4,8,58.1,0
+2025-01-01T12:04:56,148,punch,quick jab,"Round 8, Timer 57",169.2,138.0,8,57.3,1
+2025-01-01T12:04:58,149,combo,continuing 1-hit combo,"Round 8, Timer 56",169.2,130.9,8,56.1,2
+2025-01-01T12:05:00,150,special_move,special attack,"Round 8, Timer 55",149.6,110.2,8,54.8,2
+2025-01-01T12:05:02,151,kick,mid kick,"Round 8, Timer 54",149.6,92.5,8,54.3,2
+2025-01-01T12:05:04,152,special_move,special attack,"Round 8, Timer 54",149.6,60.0,8,53.7,2
+2025-01-01T12:05:06,153,combo,continuing 2-hit combo,"Round 8, Timer 53",149.6,54.5,8,52.8,3
+2025-01-01T12:05:08,154,kick,mid kick,"Round 8, Timer 52",142.3,45.8,8,51.8,3
+2025-01-01T12:05:10,155,combo,continuing 3-hit combo,"Round 8, Timer 51",124.7,30.8,8,50.7,0
+2025-01-01T12:05:12,156,block,reading opponent's attack,"Round 8, Timer 50",124.0,30.8,8,49.6,0
+2025-01-01T12:05:14,157,special_move,special attack,"Round 8, Timer 49",124.0,7.0,8,48.6,0
+2025-01-01T12:05:16,158,kick,pressuring low-HP opponent,"Round 8, Timer 48",124.0,0.0,8,47.8,0
+2025-01-01T12:05:18,159,round_start,new round beginning,"Round 8, Timer 47",170.0,170.0,9,60.0,0
+2025-01-01T12:05:20,160,punch,quick jab,"Round 9, Timer 59",162.4,163.5,9,58.6,0
+2025-01-01T12:05:22,161,punch,quick jab,"Round 9, Timer 58",153.9,155.4,9,58.0,0
+2025-01-01T12:05:24,162,block,reading opponent's attack,"Round 9, Timer 57",152.6,155.4,9,56.8,0
+2025-01-01T12:05:26,163,dodge,sidestepping,"Round 9, Timer 56",152.6,155.4,9,55.6,0
+2025-01-01T12:05:28,164,throw,throw whiffed,"Round 9, Timer 54",152.6,155.4,9,54.3,0
+2025-01-01T12:05:30,165,special_move,special attack,"Round 9, Timer 53",152.6,127.4,9,53.4,0
+2025-01-01T12:05:32,166,punch,quick jab,"Round 9, Timer 53",152.6,120.3,9,52.8,0
+2025-01-01T12:05:34,167,punch,quick jab,"Round 9, Timer 52",152.6,110.4,9,52.0,0
+2025-01-01T12:05:36,168,special_move,special attack,"Round 9, Timer 51",129.5,93.8,9,51.0,0
+2025-01-01T12:05:38,169,dodge,sidestepping,"Round 9, Timer 50",129.5,93.8,9,50.4,0
+2025-01-01T12:05:40,170,throw,throw whiffed,"Round 9, Timer 49",129.5,93.8,9,49.1,0
+2025-01-01T12:05:42,171,kick,mid kick,"Round 9, Timer 48",129.5,85.4,9,47.9,0
+2025-01-01T12:05:44,172,dodge,sidestepping,"Round 9, Timer 47",129.5,85.4,9,46.8,0
+2025-01-01T12:05:46,173,throw,throw whiffed,"Round 9, Timer 46",129.5,85.4,9,46.1,0
+2025-01-01T12:05:48,174,kick,mid kick,"Round 9, Timer 45",129.5,74.1,9,45.5,0
+2025-01-01T12:05:50,175,block,reading opponent's attack,"Round 9, Timer 45",128.6,74.1,9,44.7,0
+2025-01-01T12:05:52,176,dodge,sidestepping,"Round 9, Timer 43",128.6,74.1,9,43.2,0
+2025-01-01T12:05:54,177,special_move,special attack,"Round 9, Timer 42",128.6,52.8,9,42.2,0
+2025-01-01T12:05:56,178,special_move,special attack,"Round 9, Timer 41",128.6,18.0,9,41.3,0
+2025-01-01T12:05:58,179,special_move,finishing opponent with special,"Round 9, Timer 40",128.6,0.0,9,40.3,0
+2025-01-01T12:06:00,180,round_start,new round beginning,"Round 9, Timer 39",170.0,170.0,10,60.0,0
+2025-01-01T12:06:02,181,punch,quick jab,"Round 10, Timer 59",170.0,161.2,10,58.7,0
+2025-01-01T12:06:04,182,punch,quick jab,"Round 10, Timer 58",162.6,149.3,10,57.5,0
+2025-01-01T12:06:06,183,throw,throw attempt,"Round 10, Timer 56",162.6,124.4,10,56.5,0
+2025-01-01T12:06:08,184,punch,quick jab,"Round 10, Timer 56",162.6,113.6,10,55.5,0
+2025-01-01T12:06:10,185,kick,mid kick,"Round 10, Timer 55",149.4,97.2,10,54.5,0
+2025-01-01T12:06:12,186,dodge,sidestepping,"Round 10, Timer 54",149.4,97.2,10,53.6,0
+2025-01-01T12:06:14,187,dodge,sidestepping,"Round 10, Timer 53",149.4,97.2,10,52.6,0
+2025-01-01T12:06:16,188,kick,mid kick,"Round 10, Timer 51",149.4,81.3,10,51.3,0
+2025-01-01T12:06:18,189,dodge,sidestepping,"Round 10, Timer 50",149.4,81.3,10,50.3,0
+2025-01-01T12:06:20,190,kick,mid kick,"Round 10, Timer 49",149.4,67.5,10,49.5,0
+2025-01-01T12:06:22,191,special_move,special attack,"Round 10, Timer 49",149.4,45.6,10,48.8,0
+2025-01-01T12:06:24,192,kick,mid kick,"Round 10, Timer 48",149.4,35.7,10,47.9,0
+2025-01-01T12:06:26,193,block,reading opponent's attack,"Round 10, Timer 47",149.2,35.7,10,47.1,0
+2025-01-01T12:06:28,194,block,reading opponent's attack,"Round 10, Timer 46",146.8,35.7,10,45.9,0
+2025-01-01T12:06:30,195,block,reading opponent's attack,"Round 10, Timer 45",144.3,35.7,10,45.0,0
+2025-01-01T12:06:32,196,special_move,special attack,"Round 10, Timer 44",144.3,19.9,10,43.5,0
+2025-01-01T12:06:34,197,kick,pressuring low-HP opponent,"Round 10, Timer 42",144.3,7.5,10,42.2,0
+2025-01-01T12:06:36,198,kick,pressuring low-HP opponent,"Round 10, Timer 41",144.3,0.0,10,41.1,0
+2025-01-01T12:06:38,199,round_start,new round beginning,"Round 10, Timer 40",170.0,170.0,11,60.0,0
+2025-01-01T12:06:40,200,punch,quick jab,"Round 11, Timer 59",154.6,161.7,11,58.8,0
+2025-01-01T12:06:42,201,dodge,sidestepping,"Round 11, Timer 58",154.6,161.7,11,57.7,0
+2025-01-01T12:06:44,202,dodge,sidestepping,"Round 11, Timer 56",154.6,161.7,11,56.3,0
+2025-01-01T12:06:46,203,kick,mid kick,"Round 11, Timer 55",154.6,146.5,11,55.5,0
+2025-01-01T12:06:48,204,punch,quick jab,"Round 11, Timer 55",154.6,137.1,11,54.9,0
+2025-01-01T12:06:50,205,kick,mid kick,"Round 11, Timer 54",154.6,128.1,11,53.7,0
+2025-01-01T12:06:52,206,block,reading opponent's attack,"Round 11, Timer 53",151.9,128.1,11,52.7,0
+2025-01-01T12:06:54,207,block,reading opponent's attack,"Round 11, Timer 52",151.0,128.1,11,52.2,0
+2025-01-01T12:06:56,208,punch,quick jab,"Round 11, Timer 51",151.0,119.4,11,51.3,0
+2025-01-01T12:06:58,209,punch,quick jab,"Round 11, Timer 51",132.3,108.3,11,50.6,0
+2025-01-01T12:07:00,210,special_move,special attack,"Round 11, Timer 50",122.2,88.2,11,50.0,0
+2025-01-01T12:07:02,211,block,reading opponent's attack,"Round 11, Timer 49",121.8,88.2,11,48.6,0
+2025-01-01T12:07:04,212,kick,mid kick,"Round 11, Timer 48",121.8,74.4,11,47.7,0
+2025-01-01T12:07:06,213,dodge,sidestepping,"Round 11, Timer 47",121.8,74.4,11,46.9,0
+2025-01-01T12:07:08,214,kick,mid kick,"Round 11, Timer 46",121.8,61.5,11,46.2,0
+2025-01-01T12:07:10,215,dodge,sidestepping,"Round 11, Timer 45",121.8,61.5,11,45.1,0
+2025-01-01T12:07:12,216,dodge,sidestepping,"Round 11, Timer 44",121.8,61.5,11,44.3,0
+2025-01-01T12:07:14,217,kick,mid kick,"Round 11, Timer 43",121.8,47.9,11,43.2,0
+2025-01-01T12:07:16,218,throw,throw attempt,"Round 11, Timer 43",104.8,23.8,11,42.6,0
+2025-01-01T12:07:18,219,special_move,finishing opponent with special,"Round 11, Timer 42",104.8,0.0,11,41.5,0
+2025-01-01T12:07:20,220,round_start,new round beginning,"Round 11, Timer 40",170.0,170.0,12,60.0,0
+2025-01-01T12:07:22,221,block,reading opponent's attack,"Round 12, Timer 59",167.5,170.0,12,58.8,0
+2025-01-01T12:07:24,222,dodge,sidestepping,"Round 12, Timer 58",167.5,170.0,12,57.7,0
+2025-01-01T12:07:26,223,kick,mid kick,"Round 12, Timer 57",167.5,157.6,12,56.5,0
+2025-01-01T12:07:28,224,kick,mid kick,"Round 12, Timer 56",154.4,142.1,12,55.9,1
+2025-01-01T12:07:30,225,dodge,sidestepping,"Round 12, Timer 54",154.4,142.1,12,54.4,1
+2025-01-01T12:07:32,226,combo,continuing 1-hit combo,"Round 12, Timer 53",154.4,128.9,12,53.1,2
+2025-01-01T12:07:34,227,kick,mid kick,"Round 12, Timer 52",134.9,119.7,12,51.8,2
+2025-01-01T12:07:36,228,dodge,sidestepping,"Round 12, Timer 50",134.9,119.7,12,50.4,2
+2025-01-01T12:07:38,229,kick,mid kick,"Round 12, Timer 49",134.9,103.8,12,49.0,1
+2025-01-01T12:07:40,230,block,reading opponent's attack,"Round 12, Timer 48",133.1,103.8,12,48.0,1
+2025-01-01T12:07:42,231,punch,quick jab,"Round 12, Timer 47",133.1,97.2,12,46.7,1
+2025-01-01T12:07:44,232,punch,quick jab,"Round 12, Timer 46",133.1,91.7,12,45.6,1
+2025-01-01T12:07:46,233,combo,continuing 1-hit combo,"Round 12, Timer 45",133.1,85.3,12,44.8,2
+2025-01-01T12:07:48,234,combo,continuing 2-hit combo,"Round 12, Timer 44",133.1,79.4,12,44.0,3
+2025-01-01T12:07:50,235,combo,continuing 3-hit combo,"Round 12, Timer 43",133.1,67.7,12,43.4,4
+2025-01-01T12:07:52,236,combo,continuing 4-hit combo,"Round 12, Timer 42",133.1,55.2,12,42.0,5
+2025-01-01T12:07:54,237,combo,continuing 5-hit combo,"Round 12, Timer 41",133.1,45.3,12,41.0,6
+2025-01-01T12:07:56,238,combo,continuing 6-hit combo,"Round 12, Timer 40",133.1,36.6,12,39.6,7
+2025-01-01T12:07:58,239,punch,quick jab,"Round 12, Timer 38",133.1,26.8,12,38.1,7
+2025-01-01T12:08:00,240,combo,continuing 7-hit combo,"Round 12, Timer 37",114.7,19.9,12,37.3,0
+2025-01-01T12:08:02,241,kick,pressuring low-HP opponent,"Round 12, Timer 36",114.7,5.5,12,36.3,0
+2025-01-01T12:08:04,242,special_move,finishing opponent with special,"Round 12, Timer 35",114.7,0.0,12,35.2,0
+2025-01-01T12:08:06,243,round_start,new round beginning,"Round 12, Timer 35",170.0,170.0,13,60.0,0
+2025-01-01T12:08:08,244,punch,quick jab,"Round 13, Timer 59",152.0,159.6,13,58.9,1
+2025-01-01T12:08:10,245,combo,continuing 1-hit combo,"Round 13, Timer 58",133.4,145.6,13,58.1,0
+2025-01-01T12:08:12,246,punch,quick jab,"Round 13, Timer 57",133.4,138.9,13,57.5,1
+2025-01-01T12:08:14,247,combo,continuing 1-hit combo,"Round 13, Timer 57",133.4,126.0,13,56.9,2
+2025-01-01T12:08:16,248,combo,continuing 2-hit combo,"Round 13, Timer 56",133.4,120.5,13,56.1,3
+2025-01-01T12:08:18,249,special_move,special attack,"Round 13, Timer 55",120.8,89.9,13,55.1,3
+2025-01-01T12:08:20,250,combo,continuing 3-hit combo,"Round 13, Timer 54",120.8,77.1,13,53.6,4
+2025-01-01T12:08:22,251,combo,continuing 4-hit combo,"Round 13, Timer 53",106.0,62.4,13,52.6,0
+2025-01-01T12:08:24,252,block,reading opponent's attack,"Round 13, Timer 52",104.6,62.4,13,51.7,0
+2025-01-01T12:08:26,253,punch,quick jab,"Round 13, Timer 50",95.4,56.9,13,50.3,0
+2025-01-01T12:08:28,254,special_move,special attack,"Round 13, Timer 49",95.4,35.4,13,49.2,0
+2025-01-01T12:08:30,255,throw,throw attempt,"Round 13, Timer 48",95.4,13.3,13,48.2,0
+2025-01-01T12:08:32,256,kick,pressuring low-HP opponent,"Round 13, Timer 47",95.4,0.0,13,47.1,0
+2025-01-01T12:08:34,257,round_start,new round beginning,"Round 13, Timer 46",170.0,170.0,14,60.0,0
+2025-01-01T12:08:36,258,punch,quick jab,"Round 14, Timer 59",170.0,162.6,14,59.0,0
+2025-01-01T12:08:38,259,kick,mid kick,"Round 14, Timer 58",151.2,148.0,14,58.5,0
+2025-01-01T12:08:40,260,dodge,sidestepping,"Round 14, Timer 58",151.2,148.0,14,57.9,0
+2025-01-01T12:08:42,261,punch,quick jab,"Round 14, Timer 57",151.2,137.8,14,57.3,0
+2025-01-01T12:08:44,262,throw,throw attempt,"Round 14, Timer 56",151.2,121.6,14,56.2,0
+2025-01-01T12:08:46,263,block,reading opponent's attack,"Round 14, Timer 55",148.6,121.6,14,55.0,0
+2025-01-01T12:08:48,264,dodge,sidestepping,"Round 14, Timer 54",148.6,121.6,14,53.8,0
+2025-01-01T12:08:50,265,kick,mid kick,"Round 14, Timer 53",148.6,107.8,14,52.7,0
+2025-01-01T12:08:52,266,punch,quick jab,"Round 14, Timer 52",148.6,96.9,14,52.0,0
+2025-01-01T12:08:54,267,dodge,sidestepping,"Round 14, Timer 51",148.6,96.9,14,50.9,0
+2025-01-01T12:08:56,268,dodge,sidestepping,"Round 14, Timer 50",148.6,96.9,14,49.6,0
+2025-01-01T12:08:58,269,throw,throw whiffed,"Round 14, Timer 48",129.6,96.9,14,48.3,0
+2025-01-01T12:09:00,270,kick,mid kick,"Round 14, Timer 47",119.5,87.1,14,46.9,0
+2025-01-01T12:09:02,271,dodge,sidestepping,"Round 14, Timer 46",119.5,87.1,14,46.4,0
+2025-01-01T12:09:04,272,kick,mid kick,"Round 14, Timer 45",103.3,77.7,14,45.4,0
+2025-01-01T12:09:06,273,kick,mid kick,"Round 14, Timer 45",103.3,66.3,14,44.6,0
+2025-01-01T12:09:08,274,throw,throw attempt,"Round 14, Timer 43",89.1,50.7,14,43.4,0
+2025-01-01T12:09:10,275,kick,mid kick,"Round 14, Timer 42",89.1,36.1,14,42.2,0
+2025-01-01T12:09:12,276,block,reading opponent's attack,"Round 14, Timer 41",88.7,36.1,14,41.4,0
+2025-01-01T12:09:14,277,kick,mid kick,"Round 14, Timer 40",88.7,21.3,14,40.5,0
+2025-01-01T12:09:16,278,special_move,finishing opponent with special,"Round 14, Timer 40",80.7,0.0,14,39.9,0
+2025-01-01T12:09:18,279,round_start,new round beginning,"Round 14, Timer 39",170.0,170.0,15,60.0,0
+2025-01-01T12:09:20,280,kick,mid kick,"Round 15, Timer 59",170.0,158.7,15,59.4,1
+2025-01-01T12:09:22,281,combo,continuing 1-hit combo,"Round 15, Timer 59",170.0,146.7,15,58.7,2
+2025-01-01T12:09:24,282,punch,quick jab,"Round 15, Timer 57",151.2,135.6,15,57.4,1
+2025-01-01T12:09:26,283,throw,throw whiffed,"Round 15, Timer 56",151.2,135.6,15,56.0,1
+2025-01-01T12:09:28,284,combo,continuing 1-hit combo,"Round 15, Timer 55",151.2,127.4,15,55.4,2
+2025-01-01T12:09:30,285,dodge,sidestepping,"Round 15, Timer 54",151.2,127.4,15,54.3,2
+2025-01-01T12:09:32,286,punch,quick jab,"Round 15, Timer 54",151.2,118.3,15,53.7,2
+2025-01-01T12:09:34,287,combo,continuing 2-hit combo,"Round 15, Timer 53",151.2,109.9,15,52.9,3
+2025-01-01T12:09:36,288,combo,continuing 3-hit combo,"Round 15, Timer 52",151.2,99.8,15,51.8,4
+2025-01-01T12:09:38,289,dodge,sidestepping,"Round 15, Timer 51",151.2,99.8,15,51.0,4
+2025-01-01T12:09:40,290,combo,continuing 4-hit combo,"Round 15, Timer 50",151.2,93.4,15,49.7,5
+2025-01-01T12:09:42,291,block,reading opponent's attack,"Round 15, Timer 49",150.7,93.4,15,48.6,5
+2025-01-01T12:09:44,292,combo,continuing 5-hit combo,"Round 15, Timer 47",150.7,80.8,15,47.3,6
+2025-01-01T12:09:46,293,throw,throw whiffed,"Round 15, Timer 46",150.7,80.8,15,46.4,6
+2025-01-01T12:09:48,294,punch,quick jab,"Round 15, Timer 45",141.5,75.4,15,45.0,6
+2025-01-01T12:09:50,295,kick,mid kick,"Round 15, Timer 44",141.5,62.8,15,44.4,1
+2025-01-01T12:09:52,296,dodge,sidestepping,"Round 15, Timer 44",141.5,62.8,15,43.9,1
+2025-01-01T12:09:54,297,special_move,special attack,"Round 15, Timer 43",141.5,36.8,15,42.7,1
+2025-01-01T12:09:56,298,block,reading opponent's attack,"Round 15, Timer 42",140.6,36.8,15,41.8,1
+2025-01-01T12:09:58,299,combo,continuing 1-hit combo,"Round 15, Timer 41",121.6,31.1,15,40.8,0
+2025-01-01T12:10:00,300,block,reading opponent's attack,"Round 15, Timer 40",120.1,31.1,15,40.0,0
+2025-01-01T12:10:02,301,punch,quick jab,"Round 15, Timer 39",120.1,23.1,15,39.3,0
+2025-01-01T12:10:04,302,special_move,finishing opponent with special,"Round 15, Timer 39",120.1,2.4,15,38.6,0
+2025-01-01T12:10:06,303,kick,pressuring low-HP opponent,"Round 15, Timer 38",120.1,0.0,15,37.8,0
+2025-01-01T12:10:08,304,round_start,new round beginning,"Round 15, Timer 37",170.0,170.0,16,60.0,0
+2025-01-01T12:10:10,305,punch,quick jab,"Round 16, Timer 59",170.0,160.3,16,59.4,1
+2025-01-01T12:10:12,306,dodge,sidestepping,"Round 16, Timer 58",170.0,160.3,16,58.3,1
+2025-01-01T12:10:14,307,punch,quick jab,"Round 16, Timer 57",170.0,152.8,16,57.4,1
+2025-01-01T12:10:16,308,dodge,sidestepping,"Round 16, Timer 57",170.0,152.8,16,56.6,1
+2025-01-01T12:10:18,309,combo,continuing 1-hit combo,"Round 16, Timer 56",170.0,139.9,16,55.7,2
+2025-01-01T12:10:20,310,block,reading opponent's attack,"Round 16, Timer 55",167.9,139.9,16,54.6,2
+2025-01-01T12:10:22,311,kick,mid kick,"Round 16, Timer 54",159.7,128.3,16,53.5,2
+2025-01-01T12:10:24,312,combo,continuing 2-hit combo,"Round 16, Timer 52",149.0,121.0,16,52.1,0
+2025-01-01T12:10:26,313,punch,quick jab,"Round 16, Timer 51",149.0,110.6,16,50.8,0
+2025-01-01T12:10:28,314,kick,mid kick,"Round 16, Timer 50",149.0,94.9,16,50.2,1
+2025-01-01T12:10:30,315,block,reading opponent's attack,"Round 16, Timer 50",146.5,94.9,16,49.6,1
+2025-01-01T12:10:32,316,combo,continuing 1-hit combo,"Round 16, Timer 49",146.5,85.8,16,48.9,2
+2025-01-01T12:10:34,317,combo,continuing 2-hit combo,"Round 16, Timer 48",146.5,78.0,16,48.2,3
+2025-01-01T12:10:36,318,kick,mid kick,"Round 16, Timer 47",146.5,61.9,16,47.2,3
+2025-01-01T12:10:38,319,dodge,sidestepping,"Round 16, Timer 46",146.5,61.9,16,46.3,3
+2025-01-01T12:10:40,320,combo,continuing 3-hit combo,"Round 16, Timer 45",146.5,53.1,16,45.4,4
+2025-01-01T12:10:42,321,dodge,sidestepping,"Round 16, Timer 44",146.5,53.1,16,43.9,4
+2025-01-01T12:10:44,322,combo,continuing 4-hit combo,"Round 16, Timer 43",146.5,41.7,16,43.3,5
+2025-01-01T12:10:46,323,combo,continuing 5-hit combo,"Round 16, Timer 42",146.5,28.2,16,42.2,6
+2025-01-01T12:10:48,324,special_move,finishing opponent with special,"Round 16, Timer 41",137.2,0.0,16,41.4,6
+2025-01-01T12:10:50,325,round_start,new round beginning,"Round 16, Timer 40",170.0,170.0,17,60.0,0
+2025-01-01T12:10:52,326,special_move,special attack,"Round 17, Timer 59",159.5,148.0,17,59.3,0
+2025-01-01T12:10:54,327,dodge,sidestepping,"Round 17, Timer 59",159.5,148.0,17,58.5,0
+2025-01-01T12:10:56,328,punch,quick jab,"Round 17, Timer 58",159.5,136.5,17,57.7,0
+2025-01-01T12:10:58,329,punch,quick jab,"Round 17, Timer 56",159.5,129.5,17,56.4,0
+2025-01-01T12:11:00,330,block,reading opponent's attack,"Round 17, Timer 56",158.1,129.5,17,55.7,0
+2025-01-01T12:11:02,331,punch,quick jab,"Round 17, Timer 55",158.1,122.7,17,55.2,0
+2025-01-01T12:11:04,332,special_move,special attack,"Round 17, Timer 54",133.8,105.5,17,54.0,0
+2025-01-01T12:11:06,333,special_move,special attack,"Round 17, Timer 53",133.8,88.3,17,52.7,0
+2025-01-01T12:11:08,334,special_move,special attack,"Round 17, Timer 52",119.5,68.4,17,52.2,0
+2025-01-01T12:11:10,335,kick,mid kick,"Round 17, Timer 51",119.5,53.8,17,51.5,1
+2025-01-01T12:11:12,336,special_move,special attack,"Round 17, Timer 51",119.5,19.0,17,50.9,1
+2025-01-01T12:11:14,337,kick,pressuring low-HP opponent,"Round 17, Timer 50",119.5,8.5,17,49.9,1
+2025-01-01T12:11:16,338,special_move,finishing opponent with special,"Round 17, Timer 49",119.5,0.0,17,49.4,1
+2025-01-01T12:11:18,339,round_start,new round beginning,"Round 17, Timer 48",170.0,170.0,18,60.0,0
+2025-01-01T12:11:20,340,kick,mid kick,"Round 18, Timer 59",170.0,161.6,18,58.8,0
+2025-01-01T12:11:22,341,block,reading opponent's attack,"Round 18, Timer 58",168.6,161.6,18,58.1,0
+2025-01-01T12:11:24,342,throw,throw whiffed,"Round 18, Timer 57",152.0,161.6,18,56.9,0
+2025-01-01T12:11:26,343,kick,mid kick,"Round 18, Timer 56",133.0,153.1,18,55.9,1
+2025-01-01T12:11:28,344,special_move,special attack,"Round 18, Timer 55",122.6,133.1,18,54.9,1
+2025-01-01T12:11:30,345,kick,mid kick,"Round 18, Timer 54",122.6,123.8,18,53.6,1
+2025-01-01T12:11:32,346,kick,mid kick,"Round 18, Timer 52",122.6,106.1,18,52.4,1
+2025-01-01T12:11:34,347,dodge,sidestepping,"Round 18, Timer 51",122.6,106.1,18,51.0,1
+2025-01-01T12:11:36,348,combo,continuing 1-hit combo,"Round 18, Timer 50",122.6,95.0,18,49.7,2
+2025-01-01T12:11:38,349,combo,continuing 2-hit combo,"Round 18, Timer 49",122.6,89.2,18,48.7,3
+2025-01-01T12:11:40,350,kick,mid kick,"Round 18, Timer 48",104.6,74.3,18,47.9,3
+2025-01-01T12:11:42,351,kick,mid kick,"Round 18, Timer 47",90.0,56.5,18,47.0,3
+2025-01-01T12:11:44,352,block,reading opponent's attack,"Round 18, Timer 46",87.1,56.5,18,46.2,3
+2025-01-01T12:11:46,353,block,reading opponent's attack,"Round 18, Timer 46",87.0,56.5,18,45.5,3
+2025-01-01T12:11:48,354,kick,mid kick,"Round 18, Timer 45",87.0,44.7,18,45.0,3
+2025-01-01T12:11:50,355,kick,mid kick,"Round 18, Timer 44",87.0,29.1,18,43.8,3
+2025-01-01T12:11:52,356,special_move,finishing opponent with special,"Round 18, Timer 43",87.0,11.8,18,42.9,3
+2025-01-01T12:11:54,357,combo,continuing 3-hit combo,"Round 18, Timer 42",87.0,1.2,18,41.9,4
+2025-01-01T12:11:56,358,combo,continuing 4-hit combo,"Round 18, Timer 41",87.0,0.0,18,41.1,5
+2025-01-01T12:11:58,359,round_start,new round beginning,"Round 18, Timer 40",170.0,170.0,19,60.0,0
+2025-01-01T12:12:00,360,punch,quick jab,"Round 19, Timer 59",170.0,159.0,19,59.0,0
+2025-01-01T12:12:02,361,punch,quick jab,"Round 19, Timer 58",159.8,149.3,19,58.1,0
+2025-01-01T12:12:04,362,special_move,special attack,"Round 19, Timer 57",159.8,116.4,19,57.5,0
+2025-01-01T12:12:06,363,throw,throw whiffed,"Round 19, Timer 56",159.8,116.4,19,56.1,0
+2025-01-01T12:12:08,364,punch,quick jab,"Round 19, Timer 55",146.5,110.5,19,55.5,0
+2025-01-01T12:12:10,365,dodge,sidestepping,"Round 19, Timer 55",146.5,110.5,19,54.6,0
+2025-01-01T12:12:12,366,throw,throw attempt,"Round 19, Timer 54",146.5,92.4,19,53.5,0
+2025-01-01T12:12:14,367,special_move,special attack,"Round 19, Timer 52",126.9,62.0,19,52.3,0
+2025-01-01T12:12:16,368,kick,mid kick,"Round 19, Timer 51",126.9,47.2,19,51.2,0
+2025-01-01T12:12:18,369,throw,throw attempt,"Round 19, Timer 50",126.9,22.5,19,49.9,0
+2025-01-01T12:12:20,370,special_move,finishing opponent with special,"Round 19, Timer 48",120.2,5.0,19,48.5,0
+2025-01-01T12:12:22,371,kick,pressuring low-HP opponent,"Round 19, Timer 48",120.2,0.0,19,47.7,0
+2025-01-01T12:12:24,372,round_start,new round beginning,"Round 19, Timer 46",170.0,170.0,20,60.0,0
+2025-01-01T12:12:26,373,dodge,sidestepping,"Round 20, Timer 59",170.0,170.0,20,58.6,0
+2025-01-01T12:12:28,374,throw,throw whiffed,"Round 20, Timer 58",160.5,170.0,20,57.9,0
+2025-01-01T12:12:30,375,special_move,special attack,"Round 20, Timer 57",145.6,151.6,20,56.8,0
+2025-01-01T12:12:32,376,throw,throw whiffed,"Round 20, Timer 56",145.6,151.6,20,55.6,0
+2025-01-01T12:12:34,377,punch,quick jab,"Round 20, Timer 54",145.6,146.3,20,54.3,0
+2025-01-01T12:12:36,378,block,reading opponent's attack,"Round 20, Timer 53",144.3,146.3,20,53.1,0
+2025-01-01T12:12:38,379,special_move,special attack,"Round 20, Timer 52",124.8,118.8,20,52.0,0
+2025-01-01T12:12:40,380,block,reading opponent's attack,"Round 20, Timer 51",123.9,118.8,20,50.7,0
+2025-01-01T12:12:42,381,punch,quick jab,"Round 20, Timer 50",109.8,110.7,20,50.1,0
+2025-01-01T12:12:44,382,block,reading opponent's attack,"Round 20, Timer 49",107.6,110.7,20,49.3,0
+2025-01-01T12:12:46,383,dodge,sidestepping,"Round 20, Timer 48",107.6,110.7,20,47.9,0
+2025-01-01T12:12:48,384,kick,mid kick,"Round 20, Timer 47",107.6,97.1,20,47.3,0
+2025-01-01T12:12:50,385,punch,quick jab,"Round 20, Timer 47",107.6,91.4,20,46.5,1
+2025-01-01T12:12:52,386,combo,continuing 1-hit combo,"Round 20, Timer 45",107.6,77.7,20,45.4,2
+2025-01-01T12:12:54,387,kick,mid kick,"Round 20, Timer 45",107.6,62.1,20,44.6,2
+2025-01-01T12:12:56,388,combo,continuing 2-hit combo,"Round 20, Timer 44",107.6,56.9,20,43.6,3
+2025-01-01T12:12:58,389,punch,quick jab,"Round 20, Timer 43",107.6,49.4,20,42.6,1
+2025-01-01T12:13:00,390,special_move,special attack,"Round 20, Timer 41",107.6,23.7,20,41.2,1
+2025-01-01T12:13:02,391,kick,pressuring low-HP opponent,"Round 20, Timer 40",107.6,12.0,20,39.8,1
+2025-01-01T12:13:04,392,special_move,finishing opponent with special,"Round 20, Timer 39",97.5,0.0,20,38.9,1
+2025-01-01T12:13:06,393,round_start,new round beginning,"Round 20, Timer 38",170.0,170.0,21,60.0,0
+2025-01-01T12:13:08,394,dodge,sidestepping,"Round 21, Timer 59",170.0,170.0,21,59.2,0
+2025-01-01T12:13:10,395,punch,quick jab,"Round 21, Timer 58",170.0,158.2,21,58.0,0
+2025-01-01T12:13:12,396,dodge,sidestepping,"Round 21, Timer 57",170.0,158.2,21,57.2,0
+2025-01-01T12:13:14,397,punch,quick jab,"Round 21, Timer 56",162.9,149.6,21,55.9,0
+2025-01-01T12:13:16,398,special_move,special attack,"Round 21, Timer 55",162.9,125.5,21,55.1,0
+2025-01-01T12:13:18,399,throw,throw attempt,"Round 21, Timer 54",162.9,100.6,21,54.3,0
+2025-01-01T12:13:20,400,kick,mid kick,"Round 21, Timer 53",162.9,84.3,21,53.5,0
+2025-01-01T12:13:22,401,dodge,sidestepping,"Round 21, Timer 53",162.9,84.3,21,52.7,0
+2025-01-01T12:13:24,402,block,reading opponent's attack,"Round 21, Timer 52",160.0,84.3,21,51.8,0
+2025-01-01T12:13:26,403,block,reading opponent's attack,"Round 21, Timer 51",157.8,84.3,21,50.7,0
+2025-01-01T12:13:28,404,punch,quick jab,"Round 21, Timer 50",157.8,76.0,21,49.5,0
+2025-01-01T12:13:30,405,throw,throw whiffed,"Round 21, Timer 48",157.8,76.0,21,48.3,0
+2025-01-01T12:13:32,406,throw,throw whiffed,"Round 21, Timer 48",157.8,76.0,21,47.6,0
+2025-01-01T12:13:34,407,block,reading opponent's attack,"Round 21, Timer 47",157.7,76.0,21,47.0,0
+2025-01-01T12:13:36,408,punch,quick jab,"Round 21, Timer 46",142.4,70.8,21,45.5,0
+2025-01-01T12:13:38,409,block,reading opponent's attack,"Round 21, Timer 45",139.6,70.8,21,44.6,0
+2025-01-01T12:13:40,410,block,reading opponent's attack,"Round 21, Timer 43",139.4,70.8,21,43.2,0
+2025-01-01T12:13:42,411,punch,quick jab,"Round 21, Timer 43",139.4,63.6,21,42.6,0
+2025-01-01T12:13:44,412,punch,quick jab,"Round 21, Timer 42",139.4,52.2,21,41.8,0
+2025-01-01T12:13:46,413,block,reading opponent's attack,"Round 21, Timer 40",137.5,52.2,21,40.5,0
+2025-01-01T12:13:48,414,throw,throw attempt,"Round 21, Timer 39",137.5,34.7,21,39.3,0
+2025-01-01T12:13:50,415,dodge,sidestepping,"Round 21, Timer 39",137.5,34.7,21,38.6,0
+2025-01-01T12:13:52,416,kick,mid kick,"Round 21, Timer 38",127.3,24.6,21,37.8,0
+2025-01-01T12:13:54,417,kick,pressuring low-HP opponent,"Round 21, Timer 36",127.3,13.9,21,36.3,0
+2025-01-01T12:13:56,418,kick,pressuring low-HP opponent,"Round 21, Timer 36",127.3,2.1,21,35.7,0
+2025-01-01T12:13:58,419,kick,pressuring low-HP opponent,"Round 21, Timer 34",127.3,0.0,21,34.2,0
+2025-01-01T12:14:00,420,round_start,new round beginning,"Round 21, Timer 33",170.0,170.0,22,60.0,0
+2025-01-01T12:14:02,421,kick,mid kick,"Round 22, Timer 59",170.0,154.9,22,59.2,0
+2025-01-01T12:14:04,422,special_move,special attack,"Round 22, Timer 58",170.0,135.8,22,58.5,0
+2025-01-01T12:14:06,423,punch,quick jab,"Round 22, Timer 57",155.0,126.5,22,57.3,0
+2025-01-01T12:14:08,424,throw,throw attempt,"Round 22, Timer 56",155.0,107.4,22,56.2,0
+2025-01-01T12:14:10,425,block,reading opponent's attack,"Round 22, Timer 56",154.9,107.4,22,55.6,0
+2025-01-01T12:14:12,426,dodge,sidestepping,"Round 22, Timer 55",154.9,107.4,22,54.6,0
+2025-01-01T12:14:14,427,dodge,sidestepping,"Round 22, Timer 54",154.9,107.4,22,53.7,0
+2025-01-01T12:14:16,428,special_move,special attack,"Round 22, Timer 52",140.2,88.4,22,52.3,0
+2025-01-01T12:14:18,429,punch,quick jab,"Round 22, Timer 51",140.2,79.4,22,50.9,0
+2025-01-01T12:14:20,430,dodge,sidestepping,"Round 22, Timer 49",140.2,79.4,22,49.4,0
+2025-01-01T12:14:22,431,dodge,sidestepping,"Round 22, Timer 49",140.2,79.4,22,48.8,0
+2025-01-01T12:14:24,432,dodge,sidestepping,"Round 22, Timer 48",140.2,79.4,22,48.1,0
+2025-01-01T12:14:26,433,kick,mid kick,"Round 22, Timer 47",140.2,66.4,22,46.6,0
+2025-01-01T12:14:28,434,dodge,sidestepping,"Round 22, Timer 45",140.2,66.4,22,45.2,0
+2025-01-01T12:14:30,435,throw,throw attempt,"Round 22, Timer 45",120.4,41.6,22,44.7,0
+2025-01-01T12:14:32,436,special_move,special attack,"Round 22, Timer 44",120.4,7.8,22,43.6,0
+2025-01-01T12:14:34,437,special_move,finishing opponent with special,"Round 22, Timer 43",120.4,0.0,22,42.9,0
+2025-01-01T12:14:36,438,round_start,new round beginning,"Round 22, Timer 42",170.0,170.0,23,60.0,0
+2025-01-01T12:14:38,439,block,reading opponent's attack,"Round 23, Timer 59",167.6,170.0,23,59.3,0
+2025-01-01T12:14:40,440,block,reading opponent's attack,"Round 23, Timer 58",167.1,170.0,23,58.2,0
+2025-01-01T12:14:42,441,dodge,sidestepping,"Round 23, Timer 57",167.1,170.0,23,56.9,0
+2025-01-01T12:14:44,442,special_move,special attack,"Round 23, Timer 56",160.0,153.3,23,55.6,0
+2025-01-01T12:14:46,443,punch,quick jab,"Round 23, Timer 55",160.0,146.4,23,54.7,1
+2025-01-01T12:14:48,444,combo,continuing 1-hit combo,"Round 23, Timer 53",143.5,134.2,23,53.3,0
+2025-01-01T12:14:50,445,punch,quick jab,"Round 23, Timer 52",143.5,128.4,23,52.1,0
+2025-01-01T12:14:52,446,dodge,sidestepping,"Round 23, Timer 51",143.5,128.4,23,51.1,0
+2025-01-01T12:14:54,447,kick,mid kick,"Round 23, Timer 50",129.2,119.2,23,49.9,0
+2025-01-01T12:14:56,448,punch,quick jab,"Round 23, Timer 49",129.2,113.1,23,49.2,0
+2025-01-01T12:14:58,449,special_move,special attack,"Round 23, Timer 48",129.2,88.7,23,48.3,0
+2025-01-01T12:15:00,450,punch,quick jab,"Round 23, Timer 48",117.5,78.4,23,47.5,0
+2025-01-01T12:15:02,451,punch,quick jab,"Round 23, Timer 46",117.5,69.5,23,46.3,1
+2025-01-01T12:15:04,452,punch,quick jab,"Round 23, Timer 45",109.5,62.2,23,45.3,1
+2025-01-01T12:15:06,453,combo,continuing 1-hit combo,"Round 23, Timer 44",109.5,52.1,23,44.2,2
+2025-01-01T12:15:08,454,special_move,special attack,"Round 23, Timer 43",109.5,35.9,23,43.3,2
+2025-01-01T12:15:10,455,combo,continuing 2-hit combo,"Round 23, Timer 42",109.5,22.8,23,42.1,3
+2025-01-01T12:15:12,456,combo,continuing 3-hit combo,"Round 23, Timer 41",89.5,14.3,23,41.0,0
+2025-01-01T12:15:14,457,special_move,finishing opponent with special,"Round 23, Timer 40",80.4,0.0,23,39.6,0
+2025-01-01T12:15:16,458,round_start,new round beginning,"Round 23, Timer 38",170.0,170.0,24,60.0,0
+2025-01-01T12:15:18,459,dodge,sidestepping,"Round 24, Timer 59",170.0,170.0,24,58.7,0
+2025-01-01T12:15:20,460,kick,mid kick,"Round 24, Timer 58",170.0,152.1,24,57.6,0
+2025-01-01T12:15:22,461,kick,mid kick,"Round 24, Timer 56",170.0,137.2,24,56.2,0
+2025-01-01T12:15:24,462,kick,mid kick,"Round 24, Timer 55",170.0,127.5,24,55.0,0
+2025-01-01T12:15:26,463,punch,quick jab,"Round 24, Timer 54",154.9,122.4,24,53.8,1
+2025-01-01T12:15:28,464,dodge,sidestepping,"Round 24, Timer 53",154.9,122.4,24,52.8,1
+2025-01-01T12:15:30,465,combo,continuing 1-hit combo,"Round 24, Timer 52",154.9,114.7,24,52.0,2
+2025-01-01T12:15:32,466,combo,continuing 2-hit combo,"Round 24, Timer 51",154.9,101.6,24,50.8,3
+2025-01-01T12:15:34,467,punch,quick jab,"Round 24, Timer 50",140.9,95.1,24,49.5,1
+2025-01-01T12:15:36,468,combo,continuing 1-hit combo,"Round 24, Timer 48",140.9,82.7,24,48.3,2
+2025-01-01T12:15:38,469,combo,continuing 2-hit combo,"Round 24, Timer 48",125.9,69.1,24,47.6,0
+2025-01-01T12:15:40,470,dodge,sidestepping,"Round 24, Timer 47",125.9,69.1,24,46.8,0
+2025-01-01T12:15:42,471,kick,mid kick,"Round 24, Timer 46",116.4,55.1,24,45.6,0
+2025-01-01T12:15:44,472,block,reading opponent's attack,"Round 24, Timer 45",115.7,55.1,24,44.9,0
+2025-01-01T12:15:46,473,punch,quick jab,"Round 24, Timer 44",115.7,43.5,24,44.1,0
+2025-01-01T12:15:48,474,kick,mid kick,"Round 24, Timer 43",115.7,30.5,24,43.0,0
+2025-01-01T12:15:50,475,block,reading opponent's attack,"Round 24, Timer 42",114.7,30.5,24,41.8,0
+2025-01-01T12:15:52,476,punch,quick jab,"Round 24, Timer 41",114.7,22.9,24,40.9,0
+2025-01-01T12:15:54,477,special_move,finishing opponent with special,"Round 24, Timer 40",114.7,0.0,24,39.6,0
+2025-01-01T12:15:56,478,round_start,new round beginning,"Round 24, Timer 38",170.0,170.0,25,60.0,0
+2025-01-01T12:15:58,479,dodge,sidestepping,"Round 25, Timer 59",170.0,170.0,25,58.9,0
+2025-01-01T12:16:00,480,punch,quick jab,"Round 25, Timer 58",170.0,163.3,25,57.9,1
+2025-01-01T12:16:02,481,punch,quick jab,"Round 25, Timer 56",154.9,153.2,25,56.5,1
+2025-01-01T12:16:04,482,punch,quick jab,"Round 25, Timer 55",154.9,142.9,25,55.4,1
+2025-01-01T12:16:06,483,kick,mid kick,"Round 25, Timer 54",154.9,125.3,25,54.4,1
+2025-01-01T12:16:08,484,combo,continuing 1-hit combo,"Round 25, Timer 53",154.9,110.3,25,52.9,2
+2025-01-01T12:16:10,485,punch,quick jab,"Round 25, Timer 52",154.9,98.9,25,52.2,2
+2025-01-01T12:16:12,486,kick,mid kick,"Round 25, Timer 51",154.9,88.3,25,51.3,2
+2025-01-01T12:16:14,487,special_move,special attack,"Round 25, Timer 51",154.9,56.5,25,50.7,2
+2025-01-01T12:16:16,488,punch,quick jab,"Round 25, Timer 50",154.9,50.5,25,49.8,1
+2025-01-01T12:16:18,489,combo,continuing 1-hit combo,"Round 25, Timer 49",154.9,44.0,25,48.7,2
+2025-01-01T12:16:20,490,special_move,special attack,"Round 25, Timer 48",137.6,15.9,25,47.8,2
+2025-01-01T12:16:22,491,kick,pressuring low-HP opponent,"Round 25, Timer 46",137.6,6.2,25,46.4,2
+2025-01-01T12:16:24,492,combo,continuing 2-hit combo,"Round 25, Timer 45",137.6,0.0,25,45.1,3
+2025-01-01T12:16:26,493,round_start,new round beginning,"Round 25, Timer 44",170.0,170.0,26,60.0,0
+2025-01-01T12:16:28,494,throw,throw attempt,"Round 26, Timer 59",170.0,154.7,26,59.0,0
+2025-01-01T12:16:30,495,block,reading opponent's attack,"Round 26, Timer 58",167.7,154.7,26,57.5,0
+2025-01-01T12:16:32,496,dodge,sidestepping,"Round 26, Timer 57",167.7,154.7,26,56.6,0
+2025-01-01T12:16:34,497,block,reading opponent's attack,"Round 26, Timer 56",167.7,154.7,26,55.9,0
+2025-01-01T12:16:36,498,kick,mid kick,"Round 26, Timer 55",167.7,140.5,26,54.9,0
+2025-01-01T12:16:38,499,special_move,special attack,"Round 26, Timer 54",154.7,125.4,26,53.9,0
+2025-01-01T12:16:40,500,dodge,sidestepping,"Round 26, Timer 53",154.7,125.4,26,53.1,0
+2025-01-01T12:16:42,501,dodge,sidestepping,"Round 26, Timer 53",154.7,125.4,26,52.6,0
+2025-01-01T12:16:44,502,dodge,sidestepping,"Round 26, Timer 51",154.7,125.4,26,51.4,0
+2025-01-01T12:16:46,503,punch,quick jab,"Round 26, Timer 50",141.8,119.7,26,50.0,1
+2025-01-01T12:16:48,504,combo,continuing 1-hit combo,"Round 26, Timer 49",141.8,110.7,26,48.7,2
+2025-01-01T12:16:50,505,dodge,sidestepping,"Round 26, Timer 48",141.8,110.7,26,47.8,2
+2025-01-01T12:16:52,506,dodge,sidestepping,"Round 26, Timer 47",141.8,110.7,26,47.1,2
+2025-01-01T12:16:54,507,block,reading opponent's attack,"Round 26, Timer 46",141.6,110.7,26,45.9,2
+2025-01-01T12:16:56,508,punch,quick jab,"Round 26, Timer 45",141.6,105.6,26,45.0,1
+2025-01-01T12:16:58,509,throw,throw whiffed,"Round 26, Timer 44",128.6,105.6,26,44.1,1
+2025-01-01T12:17:00,510,combo,continuing 1-hit combo,"Round 26, Timer 44",128.6,92.0,26,43.5,2
+2025-01-01T12:17:02,511,combo,continuing 2-hit combo,"Round 26, Timer 43",128.6,86.2,26,42.6,3
+2025-01-01T12:17:04,512,punch,quick jab,"Round 26, Timer 41",128.6,74.7,26,41.2,3
+2025-01-01T12:17:06,513,block,reading opponent's attack,"Round 26, Timer 40",127.4,74.7,26,40.1,3
+2025-01-01T12:17:08,514,combo,continuing 3-hit combo,"Round 26, Timer 40",127.4,67.3,26,39.5,4
+2025-01-01T12:17:10,515,kick,mid kick,"Round 26, Timer 39",127.4,51.8,26,38.6,1
+2025-01-01T12:17:12,516,dodge,sidestepping,"Round 26, Timer 37",127.4,51.8,26,37.4,1
+2025-01-01T12:17:14,517,combo,continuing 1-hit combo,"Round 26, Timer 37",127.4,38.4,26,36.8,2
+2025-01-01T12:17:16,518,kick,mid kick,"Round 26, Timer 36",107.6,22.6,26,35.6,1
+2025-01-01T12:17:18,519,combo,continuing 1-hit combo,"Round 26, Timer 35",107.6,8.2,26,34.6,2
+2025-01-01T12:17:20,520,special_move,finishing opponent with special,"Round 26, Timer 33",107.6,0.0,26,33.4,2
+2025-01-01T12:17:22,521,round_start,new round beginning,"Round 26, Timer 32",170.0,170.0,27,60.0,0
+2025-01-01T12:17:24,522,punch,quick jab,"Round 27, Timer 59",170.0,160.0,27,59.4,0
+2025-01-01T12:17:26,523,punch,quick jab,"Round 27, Timer 59",170.0,155.0,27,58.6,0
+2025-01-01T12:17:28,524,punch,quick jab,"Round 27, Timer 58",170.0,148.7,27,57.8,0
+2025-01-01T12:17:30,525,punch,quick jab,"Round 27, Timer 57",170.0,141.2,27,56.9,1
+2025-01-01T12:17:32,526,combo,continuing 1-hit combo,"Round 27, Timer 56",170.0,133.3,27,56.1,2
+2025-01-01T12:17:34,527,dodge,sidestepping,"Round 27, Timer 56",170.0,133.3,27,55.5,2
+2025-01-01T12:17:36,528,punch,quick jab,"Round 27, Timer 54",157.6,125.6,27,54.0,1
+2025-01-01T12:17:38,529,combo,continuing 1-hit combo,"Round 27, Timer 53",157.6,116.4,27,53.5,2
+2025-01-01T12:17:40,530,combo,continuing 2-hit combo,"Round 27, Timer 53",157.6,108.9,27,52.9,3
+2025-01-01T12:17:42,531,combo,continuing 3-hit combo,"Round 27, Timer 52",157.6,102.9,27,51.8,4
+2025-01-01T12:17:44,532,combo,continuing 4-hit combo,"Round 27, Timer 50",157.6,91.7,27,50.4,5
+2025-01-01T12:17:46,533,combo,continuing 5-hit combo,"Round 27, Timer 50",157.6,78.5,27,49.5,6
+2025-01-01T12:17:48,534,combo,continuing 6-hit combo,"Round 27, Timer 48",157.6,70.3,27,48.0,7
+2025-01-01T12:17:50,535,combo,continuing 7-hit combo,"Round 27, Timer 47",157.6,55.7,27,47.3,8
+2025-01-01T12:17:52,536,special_move,special attack,"Round 27, Timer 47",143.8,29.1,27,46.6,8
+2025-01-01T12:17:54,537,combo,continuing 8-hit combo,"Round 27, Timer 46",143.8,18.5,27,45.7,9
+2025-01-01T12:17:56,538,kick,pressuring low-HP opponent,"Round 27, Timer 45",143.8,1.0,27,44.6,9
+2025-01-01T12:17:58,539,kick,pressuring low-HP opponent,"Round 27, Timer 44",143.8,0.0,27,43.7,9
+2025-01-01T12:18:00,540,round_start,new round beginning,"Round 27, Timer 42",170.0,170.0,28,60.0,0
+2025-01-01T12:18:02,541,block,reading opponent's attack,"Round 28, Timer 59",168.8,170.0,28,58.7,0
+2025-01-01T12:18:04,542,throw,throw attempt,"Round 28, Timer 58",168.8,148.4,28,57.7,0
+2025-01-01T12:18:06,543,punch,quick jab,"Round 28, Timer 56",168.8,136.5,28,56.4,0
+2025-01-01T12:18:08,544,dodge,sidestepping,"Round 28, Timer 55",168.8,136.5,28,55.4,0
+2025-01-01T12:18:10,545,special_move,special attack,"Round 28, Timer 54",168.8,105.7,28,54.2,0
+2025-01-01T12:18:12,546,throw,throw attempt,"Round 28, Timer 53",168.8,83.0,28,53.2,0
+2025-01-01T12:18:14,547,throw,throw attempt,"Round 28, Timer 52",168.8,58.1,28,52.3,0
+2025-01-01T12:18:16,548,block,reading opponent's attack,"Round 28, Timer 51",165.9,58.1,28,51.4,0
+2025-01-01T12:18:18,549,punch,quick jab,"Round 28, Timer 50",165.9,51.3,28,50.5,0
+2025-01-01T12:18:20,550,throw,throw attempt,"Round 28, Timer 49",165.9,32.4,28,49.4,0
+2025-01-01T12:18:22,551,special_move,special attack,"Round 28, Timer 48",154.8,10.5,28,48.3,0
+2025-01-01T12:18:24,552,special_move,finishing opponent with special,"Round 28, Timer 47",146.7,0.0,28,46.8,0
+2025-01-01T12:18:26,553,round_start,new round beginning,"Round 28, Timer 46",170.0,170.0,29,60.0,0
+2025-01-01T12:18:28,554,special_move,special attack,"Round 29, Timer 59",170.0,145.5,29,59.3,0
+2025-01-01T12:18:30,555,kick,mid kick,"Round 29, Timer 58",170.0,129.4,29,58.5,1
+2025-01-01T12:18:32,556,punch,quick jab,"Round 29, Timer 57",162.6,117.5,29,57.3,1
+2025-01-01T12:18:34,557,punch,quick jab,"Round 29, Timer 56",162.6,109.7,29,56.3,1
+2025-01-01T12:18:36,558,combo,continuing 1-hit combo,"Round 29, Timer 55",162.6,98.5,29,55.3,2
+2025-01-01T12:18:38,559,combo,continuing 2-hit combo,"Round 29, Timer 54",162.6,86.5,29,54.2,3
+2025-01-01T12:18:40,560,punch,quick jab,"Round 29, Timer 53",152.7,80.8,29,53.0,3
+2025-01-01T12:18:42,561,combo,continuing 3-hit combo,"Round 29, Timer 52",152.7,67.1,29,52.0,4
+2025-01-01T12:18:44,562,throw,throw whiffed,"Round 29, Timer 51",135.0,67.1,29,50.9,4
+2025-01-01T12:18:46,563,block,reading opponent's attack,"Round 29, Timer 50",134.1,67.1,29,49.8,4
+2025-01-01T12:18:48,564,combo,continuing 4-hit combo,"Round 29, Timer 49",121.1,60.8,29,48.7,0
+2025-01-01T12:18:50,565,block,reading opponent's attack,"Round 29, Timer 48",119.5,60.8,29,48.0,0
+2025-01-01T12:18:52,566,punch,quick jab,"Round 29, Timer 47",119.5,53.1,29,47.1,1
+2025-01-01T12:18:54,567,dodge,sidestepping,"Round 29, Timer 46",119.5,53.1,29,45.9,1
+2025-01-01T12:18:56,568,combo,continuing 1-hit combo,"Round 29, Timer 45",119.5,46.7,29,44.8,2
+2025-01-01T12:18:58,569,combo,continuing 2-hit combo,"Round 29, Timer 44",108.2,38.1,29,43.9,0
+2025-01-01T12:19:00,570,dodge,sidestepping,"Round 29, Timer 43",108.2,38.1,29,42.5,0
+2025-01-01T12:19:02,571,special_move,special attack,"Round 29, Timer 42",108.2,9.4,29,41.5,0
+2025-01-01T12:19:04,572,special_move,finishing opponent with special,"Round 29, Timer 41",108.2,0.0,29,40.6,0
+2025-01-01T12:19:06,573,round_start,new round beginning,"Round 29, Timer 40",170.0,170.0,30,60.0,0
+2025-01-01T12:19:08,574,special_move,special attack,"Round 30, Timer 59",170.0,151.6,30,59.2,0
+2025-01-01T12:19:10,575,special_move,special attack,"Round 30, Timer 58",152.2,134.4,30,58.0,0
+2025-01-01T12:19:12,576,dodge,sidestepping,"Round 30, Timer 57",152.2,134.4,30,57.1,0
+2025-01-01T12:19:14,577,block,reading opponent's attack,"Round 30, Timer 57",150.6,134.4,30,56.6,0
+2025-01-01T12:19:16,578,punch,quick jab,"Round 30, Timer 55",130.6,123.6,30,55.1,0
+2025-01-01T12:19:18,579,kick,mid kick,"Round 30, Timer 54",130.6,107.4,30,54.1,0
+2025-01-01T12:19:20,580,punch,quick jab,"Round 30, Timer 53",130.6,96.7,30,52.8,0
+2025-01-01T12:19:22,581,throw,throw attempt,"Round 30, Timer 52",122.5,80.3,30,51.6,0
+2025-01-01T12:19:24,582,kick,mid kick,"Round 30, Timer 51",107.0,69.5,30,51.1,0
+2025-01-01T12:19:26,583,kick,mid kick,"Round 30, Timer 50",107.0,52.9,30,50.3,0
+2025-01-01T12:19:28,584,dodge,sidestepping,"Round 30, Timer 50",107.0,52.9,30,49.7,0
+2025-01-01T12:19:30,585,dodge,sidestepping,"Round 30, Timer 48",107.0,52.9,30,48.4,0
+2025-01-01T12:19:32,586,dodge,sidestepping,"Round 30, Timer 47",107.0,52.9,30,46.9,0
+2025-01-01T12:19:34,587,dodge,sidestepping,"Round 30, Timer 46",107.0,52.9,30,46.3,0
+2025-01-01T12:19:36,588,block,reading opponent's attack,"Round 30, Timer 46",104.5,52.9,30,45.5,0
+2025-01-01T12:19:38,589,block,reading opponent's attack,"Round 30, Timer 44",103.0,52.9,30,44.3,0
+2025-01-01T12:19:40,590,kick,mid kick,"Round 30, Timer 43",103.0,40.8,30,43.2,0
+2025-01-01T12:19:42,591,punch,quick jab,"Round 30, Timer 42",103.0,32.2,30,41.8,1
+2025-01-01T12:19:44,592,kick,mid kick,"Round 30, Timer 41",103.0,24.2,30,40.9,1
+2025-01-01T12:19:46,593,combo,continuing 1-hit combo,"Round 30, Timer 40",103.0,12.5,30,39.7,2
+2025-01-01T12:19:48,594,special_move,finishing opponent with special,"Round 30, Timer 39",103.0,0.0,30,39.1,2
+2025-01-01T12:19:50,595,round_start,new round beginning,"Round 30, Timer 38",170.0,170.0,31,60.0,0
+2025-01-01T12:19:52,596,kick,mid kick,"Round 31, Timer 59",170.0,156.2,31,58.7,0
+2025-01-01T12:19:54,597,block,reading opponent's attack,"Round 31, Timer 58",169.9,156.2,31,57.8,0
+2025-01-01T12:19:56,598,block,reading opponent's attack,"Round 31, Timer 57",168.5,156.2,31,57.2,0
+2025-01-01T12:19:58,599,dodge,sidestepping,"Round 31, Timer 57",168.5,156.2,31,56.6,0
+2025-01-01T12:20:00,600,punch,quick jab,"Round 31, Timer 56",168.5,144.5,31,55.7,1
+2025-01-01T12:20:02,601,punch,quick jab,"Round 31, Timer 55",168.5,133.0,31,55.0,1
+2025-01-01T12:20:04,602,combo,continuing 1-hit combo,"Round 31, Timer 54",168.5,118.9,31,54.3,2
+2025-01-01T12:20:06,603,combo,continuing 2-hit combo,"Round 31, Timer 53",168.5,107.0,31,53.4,3
+2025-01-01T12:20:08,604,punch,quick jab,"Round 31, Timer 52",153.3,98.6,31,52.2,1
+2025-01-01T12:20:10,605,dodge,sidestepping,"Round 31, Timer 52",153.3,98.6,31,51.7,1
+2025-01-01T12:20:12,606,combo,continuing 1-hit combo,"Round 31, Timer 50",139.4,92.3,31,50.2,0
+2025-01-01T12:20:14,607,punch,quick jab,"Round 31, Timer 49",122.8,85.1,31,49.0,0
+2025-01-01T12:20:16,608,punch,quick jab,"Round 31, Timer 48",122.8,73.1,31,47.7,1
+2025-01-01T12:20:18,609,kick,mid kick,"Round 31, Timer 47",111.7,57.9,31,47.2,1
+2025-01-01T12:20:20,610,punch,quick jab,"Round 31, Timer 46",111.7,52.2,31,46.1,1
+2025-01-01T12:20:22,611,kick,mid kick,"Round 31, Timer 45",98.4,42.8,31,45.2,1
+2025-01-01T12:20:24,612,block,reading opponent's attack,"Round 31, Timer 44",96.3,42.8,31,44.1,1
+2025-01-01T12:20:26,613,kick,mid kick,"Round 31, Timer 43",96.3,29.6,31,42.7,1
+2025-01-01T12:20:28,614,combo,continuing 1-hit combo,"Round 31, Timer 42",96.3,15.7,31,41.9,2
+2025-01-01T12:20:30,615,combo,continuing 2-hit combo,"Round 31, Timer 41",96.3,5.7,31,40.9,3
+2025-01-01T12:20:32,616,kick,pressuring low-HP opponent,"Round 31, Timer 40",96.3,0.0,31,39.9,3
+2025-01-01T12:20:34,617,round_start,new round beginning,"Round 31, Timer 39",170.0,170.0,32,60.0,0
+2025-01-01T12:20:36,618,throw,throw attempt,"Round 32, Timer 59",170.0,148.2,32,58.6,0
+2025-01-01T12:20:38,619,block,reading opponent's attack,"Round 32, Timer 57",169.9,148.2,32,57.2,0
+2025-01-01T12:20:40,620,kick,mid kick,"Round 32, Timer 57",169.9,139.8,32,56.6,1
+2025-01-01T12:20:42,621,special_move,special attack,"Round 32, Timer 56",156.9,116.5,32,55.6,1
+2025-01-01T12:20:44,622,combo,continuing 1-hit combo,"Round 32, Timer 54",156.9,108.4,32,54.5,2
+2025-01-01T12:20:46,623,special_move,special attack,"Round 32, Timer 54",156.9,85.5,32,53.8,2
+2025-01-01T12:20:48,624,combo,continuing 2-hit combo,"Round 32, Timer 53",156.9,73.6,32,52.6,3
+2025-01-01T12:20:50,625,combo,continuing 3-hit combo,"Round 32, Timer 51",156.9,67.7,32,51.3,4
+2025-01-01T12:20:52,626,kick,mid kick,"Round 32, Timer 50",141.3,52.3,32,50.3,4
+2025-01-01T12:20:54,627,combo,continuing 4-hit combo,"Round 32, Timer 49",141.3,37.8,32,49.1,5
+2025-01-01T12:20:56,628,punch,quick jab,"Round 32, Timer 48",123.0,31.9,32,47.8,5
+2025-01-01T12:20:58,629,combo,continuing 5-hit combo,"Round 32, Timer 47",123.0,18.8,32,46.6,6
+2025-01-01T12:21:00,630,kick,pressuring low-HP opponent,"Round 32, Timer 46",123.0,10.0,32,46.0,6
+2025-01-01T12:21:02,631,combo,continuing 6-hit combo,"Round 32, Timer 45",123.0,0.0,32,45.0,7
+2025-01-01T12:21:04,632,combo,continuing 7-hit combo,"Round 32, Timer 44",123.0,0.0,32,44.2,8
+2025-01-01T12:21:06,633,round_start,new round beginning,"Round 32, Timer 43",170.0,170.0,33,60.0,0
+2025-01-01T12:21:08,634,special_move,special attack,"Round 33, Timer 59",157.9,154.1,33,59.3,0
+2025-01-01T12:21:10,635,punch,quick jab,"Round 33, Timer 58",157.9,142.6,33,58.4,0
+2025-01-01T12:21:12,636,block,reading opponent's attack,"Round 33, Timer 57",156.7,142.6,33,57.0,0
+2025-01-01T12:21:14,637,kick,mid kick,"Round 33, Timer 56",146.1,127.4,33,56.2,0
+2025-01-01T12:21:16,638,dodge,sidestepping,"Round 33, Timer 55",146.1,127.4,33,55.2,0
+2025-01-01T12:21:18,639,dodge,sidestepping,"Round 33, Timer 54",146.1,127.4,33,54.5,0
+2025-01-01T12:21:20,640,dodge,sidestepping,"Round 33, Timer 53",146.1,127.4,33,53.0,0
+2025-01-01T12:21:22,641,special_move,special attack,"Round 33, Timer 52",132.8,106.8,33,52.4,0
+2025-01-01T12:21:24,642,punch,quick jab,"Round 33, Timer 52",132.8,97.8,33,51.9,0
+2025-01-01T12:21:26,643,throw,throw attempt,"Round 33, Timer 51",114.3,75.1,33,50.9,0
+2025-01-01T12:21:28,644,punch,quick jab,"Round 33, Timer 50",104.1,70.0,33,49.7,0
+2025-01-01T12:21:30,645,dodge,sidestepping,"Round 33, Timer 48",104.1,70.0,33,48.3,0
+2025-01-01T12:21:32,646,punch,quick jab,"Round 33, Timer 47",104.1,60.4,33,46.9,0
+2025-01-01T12:21:34,647,special_move,special attack,"Round 33, Timer 46",84.1,40.7,33,46.3,0
+2025-01-01T12:21:36,648,punch,quick jab,"Round 33, Timer 45",84.1,29.2,33,45.1,0
+2025-01-01T12:21:38,649,special_move,finishing opponent with special,"Round 33, Timer 44",78.2,0.0,33,43.9,0
+2025-01-01T12:21:40,650,round_start,new round beginning,"Round 33, Timer 43",170.0,170.0,34,60.0,0
+2025-01-01T12:21:42,651,punch,quick jab,"Round 34, Timer 59",170.0,161.0,34,58.7,0
+2025-01-01T12:21:44,652,kick,mid kick,"Round 34, Timer 58",170.0,149.9,34,57.9,0
+2025-01-01T12:21:46,653,kick,mid kick,"Round 34, Timer 57",153.3,139.2,34,56.7,1
+2025-01-01T12:21:48,654,combo,continuing 1-hit combo,"Round 34, Timer 56",153.3,132.5,34,55.6,2
+2025-01-01T12:21:50,655,dodge,sidestepping,"Round 34, Timer 55",153.3,132.5,34,54.7,2
+2025-01-01T12:21:52,656,combo,continuing 2-hit combo,"Round 34, Timer 54",141.7,124.9,34,54.0,0
+2025-01-01T12:21:54,657,dodge,sidestepping,"Round 34, Timer 53",141.7,124.9,34,52.8,0
+2025-01-01T12:21:56,658,punch,quick jab,"Round 34, Timer 52",133.0,114.0,34,51.6,0
+2025-01-01T12:21:58,659,special_move,special attack,"Round 34, Timer 51",102.0,85.5,34,50.8,0
+2025-01-01T12:22:00,660,block,reading opponent's attack,"Round 34, Timer 50",101.3,85.5,34,49.8,0
+2025-01-01T12:22:02,661,dodge,sidestepping,"Round 34, Timer 49",101.3,85.5,34,48.9,0
+2025-01-01T12:22:04,662,punch,quick jab,"Round 34, Timer 48",83.9,74.7,34,48.2,0
+2025-01-01T12:22:06,663,throw,throw whiffed,"Round 34, Timer 47",83.9,74.7,34,47.3,0
+2025-01-01T12:22:08,664,dodge,sidestepping,"Round 34, Timer 47",83.9,74.7,34,46.6,0
+2025-01-01T12:22:10,665,punch,quick jab,"Round 34, Timer 46",65.3,63.3,34,46.1,0
+2025-01-01T12:22:12,666,kick,mid kick,"Round 34, Timer 45",51.7,54.9,34,44.7,0
+2025-01-01T12:22:14,667,kick,mid kick,"Round 34, Timer 43",43.5,46.6,34,43.4,0
+2025-01-01T12:22:16,668,kick,mid kick,"Round 34, Timer 43",43.5,29.8,34,42.7,1
+2025-01-01T12:22:18,669,combo,continuing 1-hit combo,"Round 34, Timer 42",43.5,20.7,34,42.0,2
+2025-01-01T12:22:20,670,combo,continuing 2-hit combo,"Round 34, Timer 41",43.5,14.3,34,41.4,3
+2025-01-01T12:22:22,671,kick,pressuring low-HP opponent,"Round 34, Timer 40",43.5,0.0,34,40.0,3
+2025-01-01T12:22:24,672,round_start,new round beginning,"Round 34, Timer 39",170.0,170.0,35,60.0,0
+2025-01-01T12:22:26,673,block,reading opponent's attack,"Round 35, Timer 59",168.9,170.0,35,58.5,0
+2025-01-01T12:22:28,674,special_move,special attack,"Round 35, Timer 57",168.9,136.7,35,57.5,0
+2025-01-01T12:22:30,675,kick,mid kick,"Round 35, Timer 57",168.9,126.6,35,56.8,0
+2025-01-01T12:22:32,676,dodge,sidestepping,"Round 35, Timer 56",168.9,126.6,35,56.2,0
+2025-01-01T12:22:34,677,block,reading opponent's attack,"Round 35, Timer 55",165.9,126.6,35,55.2,0
+2025-01-01T12:22:36,678,punch,quick jab,"Round 35, Timer 54",165.9,117.0,35,53.7,1
+2025-01-01T12:22:38,679,combo,continuing 1-hit combo,"Round 35, Timer 52",165.9,102.0,35,52.3,2
+2025-01-01T12:22:40,680,kick,mid kick,"Round 35, Timer 51",152.0,85.6,35,51.0,2
+2025-01-01T12:22:42,681,dodge,sidestepping,"Round 35, Timer 50",152.0,85.6,35,49.7,2
+2025-01-01T12:22:44,682,dodge,sidestepping,"Round 35, Timer 49",152.0,85.6,35,49.1,2
+2025-01-01T12:22:46,683,punch,quick jab,"Round 35, Timer 48",152.0,73.7,35,48.1,2
+2025-01-01T12:22:48,684,combo,continuing 2-hit combo,"Round 35, Timer 47",152.0,67.8,35,47.3,3
+2025-01-01T12:22:50,685,punch,quick jab,"Round 35, Timer 47",136.3,56.4,35,46.5,1
+2025-01-01T12:22:52,686,kick,mid kick,"Round 35, Timer 45",136.3,48.1,35,45.1,1
+2025-01-01T12:22:54,687,dodge,sidestepping,"Round 35, Timer 44",136.3,48.1,35,43.8,1
+2025-01-01T12:22:56,688,combo,continuing 1-hit combo,"Round 35, Timer 42",136.3,33.7,35,42.4,2
+2025-01-01T12:22:58,689,combo,continuing 2-hit combo,"Round 35, Timer 42",136.3,27.4,35,41.8,3
+2025-01-01T12:23:00,690,kick,pressuring low-HP opponent,"Round 35, Timer 40",136.3,12.9,35,40.3,3
+2025-01-01T12:23:02,691,kick,pressuring low-HP opponent,"Round 35, Timer 40",136.3,0.0,35,39.7,3
+2025-01-01T12:23:04,692,round_start,new round beginning,"Round 35, Timer 38",170.0,170.0,36,60.0,0
+2025-01-01T12:23:06,693,throw,throw attempt,"Round 36, Timer 59",170.0,151.9,36,59.3,0
+2025-01-01T12:23:08,694,block,reading opponent's attack,"Round 36, Timer 59",167.2,151.9,36,58.6,0
+2025-01-01T12:23:10,695,kick,mid kick,"Round 36, Timer 57",153.1,134.0,36,57.2,0
+2025-01-01T12:23:12,696,dodge,sidestepping,"Round 36, Timer 56",153.1,134.0,36,55.8,0
+2025-01-01T12:23:14,697,throw,throw whiffed,"Round 36, Timer 55",136.9,134.0,36,55.1,0
+2025-01-01T12:23:16,698,dodge,sidestepping,"Round 36, Timer 54",136.9,134.0,36,54.3,0
+2025-01-01T12:23:18,699,dodge,sidestepping,"Round 36, Timer 54",136.9,134.0,36,53.7,0
+2025-01-01T12:23:20,700,block,reading opponent's attack,"Round 36, Timer 53",135.0,134.0,36,53.1,0
+2025-01-01T12:23:22,701,kick,mid kick,"Round 36, Timer 52",126.2,123.3,36,51.7,0
+2025-01-01T12:23:24,702,punch,quick jab,"Round 36, Timer 51",126.2,115.6,36,51.1,0
+2025-01-01T12:23:26,703,special_move,special attack,"Round 36, Timer 50",114.0,93.1,36,49.7,0
+2025-01-01T12:23:28,704,block,reading opponent's attack,"Round 36, Timer 48",111.9,93.1,36,48.3,0
+2025-01-01T12:23:30,705,punch,quick jab,"Round 36, Timer 48",92.6,82.1,36,47.7,1
+2025-01-01T12:23:32,706,combo,continuing 1-hit combo,"Round 36, Timer 47",92.6,73.4,36,47.1,2
+2025-01-01T12:23:34,707,punch,quick jab,"Round 36, Timer 46",92.6,64.2,36,46.0,2
+2025-01-01T12:23:36,708,punch,quick jab,"Round 36, Timer 46",84.6,53.0,36,45.5,1
+2025-01-01T12:23:38,709,block,reading opponent's attack,"Round 36, Timer 45",82.4,53.0,36,44.8,1
+2025-01-01T12:23:40,710,combo,continuing 1-hit combo,"Round 36, Timer 44",66.7,45.6,36,44.1,0
+2025-01-01T12:23:42,711,punch,quick jab,"Round 36, Timer 43",51.7,38.1,36,42.7,0
+2025-01-01T12:23:44,712,punch,quick jab,"Round 36, Timer 42",45.5,32.9,36,41.6,1
+2025-01-01T12:23:46,713,combo,continuing 1-hit combo,"Round 36, Timer 40",45.5,23.9,36,40.3,2
+2025-01-01T12:23:48,714,combo,continuing 2-hit combo,"Round 36, Timer 39",45.5,13.5,36,39.1,3
+2025-01-01T12:23:50,715,combo,continuing 3-hit combo,"Round 36, Timer 38",45.5,4.0,36,37.7,4
+2025-01-01T12:23:52,716,combo,continuing 4-hit combo,"Round 36, Timer 37",28.0,0.0,36,36.8,0
+2025-01-01T12:23:54,717,round_start,new round beginning,"Round 36, Timer 36",170.0,170.0,37,60.0,0
+2025-01-01T12:23:56,718,kick,mid kick,"Round 37, Timer 59",170.0,156.6,37,59.4,0
+2025-01-01T12:23:58,719,dodge,sidestepping,"Round 37, Timer 58",170.0,156.6,37,58.4,0

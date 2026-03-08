@@ -25,6 +25,8 @@ GENRE_SAMPLES: dict[str, tuple[str, str]] = {
     "themepark": ("sample_log.csv", "generate_sample"),
     "rpg": ("rpg_sample_log.csv", "generate_rpg_sample"),
     "action": ("action_sample_log.csv", "generate_action_sample"),
+    "survival_horror": ("survival_horror_sample_log.csv", "generate_survival_horror_sample"),
+    "fighting": ("fighting_sample_log.csv", "generate_fighting_sample"),
 }
 
 
